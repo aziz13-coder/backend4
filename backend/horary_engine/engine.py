@@ -1085,38 +1085,26 @@ class EnhancedTraditionalHoraryJudgmentEngine:
         if not ignore_radicality:
             radicality = check_enhanced_radicality(chart, ignore_saturn_7th)
             if not radicality["valid"]:
-                return {
-                    "result": "NOT RADICAL",
-                    "confidence": 0,
-                    "reasoning": [radicality["reason"]],
-                    "timing": None
-                }
-            reasoning.append(f"Radicality: {radicality['reason']}")
+                reasoning.append(f"⚠️ Radicality: {radicality['reason']}")
+                confidence = min(confidence, config.confidence.lunar_confidence_caps.neutral)
+            else:
+                reasoning.append(f"Radicality: {radicality['reason']}")
         else:
             reasoning.append("⚪ Radicality: Bypassed by override (chart validity check disabled)")
-        
-        # 1.5. HARD DENIAL: Void-of-Course Moon (traditional blocking factor WITH OVERRIDE)
+
+        # 1.5. Void-of-Course Moon caution (no early return)
         if not ignore_void_moon:
             void_check = self._is_moon_void_of_course_enhanced(chart)
-            if void_check["void"] and not void_check["exception"]:
-                # Check for strong traditional overrides (Moon carries light cleanly)
-                override_check = TraditionalOverrides.check_void_moon_overrides(chart, question_analysis, self)
-                if override_check["can_override"]:
-                    reasoning.append(f"⚠️  Void Moon noted but overridden: {override_check['reason']}")
-                    confidence = min(confidence, 30)  # Cap confidence ≤30% per requirement
+            if void_check["void"]:
+                if void_check.get("exception"):
+                    reasoning.append(f"⚠️  Void Moon noted but excepted: {void_check['reason']}")
                 else:
-                    return {
-                        "result": "NO", 
-                        "confidence": 85,  # High confidence for traditional denial
-                        "reasoning": reasoning + [f"🔴 Void Moon denial: {void_check['reason']}"],
-                        "timing": None,
-                        "traditional_factors": {
-                            "perfection_type": "void_moon_denial",
-                            "void_moon_reason": void_check["reason"]
-                        }
-                    }
-            elif void_check["void"] and void_check["exception"]:
-                reasoning.append(f"⚠️  Void Moon noted but excepted: {void_check['reason']}")
+                    override_check = TraditionalOverrides.check_void_moon_overrides(chart, question_analysis, self)
+                    if override_check.get("can_override"):
+                        reasoning.append(f"⚠️  Void Moon noted but overridden: {override_check['reason']}")
+                    else:
+                        reasoning.append(f"⚠️  Void Moon: {void_check['reason']}")
+                confidence = min(confidence, config.confidence.lunar_confidence_caps.neutral)
         
         # 2. Identify significators
         significators = self._identify_significators(chart, question_analysis)
