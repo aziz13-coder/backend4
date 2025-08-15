@@ -162,6 +162,9 @@ retrograde:
   frustration_penalty: -5 # Additional penalty for retrograde frustration
   quesited_penalty: 12    # Confidence penalty for retrograde quesited (mitigable)
 
+solar:
+  severe_impediment_denial_enabled: false  # R17b toggle for severe combustion denial
+
 reception:
   terms:
     Aries:
