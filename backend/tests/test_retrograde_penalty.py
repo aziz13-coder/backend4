@@ -12,8 +12,8 @@ from models import HoraryChart, Planet, Sign, PlanetPosition
 def make_chart():
     now = datetime.datetime.utcnow()
     planets = {
-        Planet.MARS: PlanetPosition(Planet.MARS, 0, 0, 1, Sign.ARIES, 0),
-        Planet.MERCURY: PlanetPosition(Planet.MERCURY, 0, 0, 7, Sign.GEMINI, 12, True),
+        Planet.MARS: PlanetPosition(Planet.MARS, 0, 0, 1, Sign.ARIES, 0, 0),
+        Planet.MERCURY: PlanetPosition(Planet.MERCURY, 0, 0, 7, Sign.GEMINI, 12, 12, True),
     }
     houses = [i * 30 for i in range(12)]
     house_rulers = {1: Planet.MARS, 7: Planet.MERCURY}

@@ -221,6 +221,7 @@ class EnhancedTraditionalAstrologicalCalculator:
             # Calculate comprehensive traditional dignity with all factors
             planet_pos.dignity_score = self._calculate_comprehensive_traditional_dignity(
                 planet_pos.planet, planet_pos, houses, planets[Planet.SUN], solar_analysis)
+            planet_pos.strength_score = planet_pos.dignity_score
         
         # Calculate enhanced traditional aspects
         aspects = calculate_enhanced_aspects(planets, jd_ut)
@@ -1142,12 +1143,16 @@ class EnhancedTraditionalHoraryJudgmentEngine:
             shared_planet = same_ruler_info["shared_ruler"]
             shared_position = chart.planets[shared_planet]
             
-            if shared_position.dignity_score > 0:
+            if shared_position.strength_score > 0:
                 same_ruler_bonus += 5  # Well-dignified shared ruler is very favorable
-                reasoning.append(f"Shared significator {shared_planet.value} is well-dignified (+{shared_position.dignity_score})")
-            elif shared_position.dignity_score < -10:
+                reasoning.append(
+                    f"Shared significator {shared_planet.value} is well-dignified (+{shared_position.strength_score})"
+                )
+            elif shared_position.strength_score < -10:
                 same_ruler_bonus -= 10  # Severely debilitated shared ruler reduces unity benefit
-                reasoning.append(f"Shared significator {shared_planet.value} is severely debilitated ({shared_position.dignity_score})")
+                reasoning.append(
+                    f"Shared significator {shared_planet.value} is severely debilitated ({shared_position.strength_score})"
+                )
             
             confidence += same_ruler_bonus
         
@@ -1177,7 +1182,7 @@ class EnhancedTraditionalHoraryJudgmentEngine:
                         if planet.value in [p["planet"] for p in solar_factors.get("detailed_analyses", {}).values() if p.get("condition") == "Combustion"]:
                             planet_analysis = solar_factors["detailed_analyses"].get(planet.value, {})
                             distance = planet_analysis.get("distance_from_sun", 0)
-                            planet_dignity = chart.planets[planet].dignity_score
+                            planet_dignity = chart.planets[planet].strength_score
                             
                             if distance < 1.0:  # Extremely close combustion
                                 severe_impediments += 1
@@ -1251,9 +1256,9 @@ class EnhancedTraditionalHoraryJudgmentEngine:
                     "traditional_factors": {
                         "perfection_type": "transaction_translation",
                         "reception": translation_result.get("reception", "none"),
-                        "querent_strength": chart.planets[querent_planet].dignity_score,
-                        "quesited_strength": chart.planets[quesited_planet].dignity_score,
-                        f"{item_name}_strength": chart.planets[item_significator].dignity_score
+                        "querent_strength": chart.planets[querent_planet].strength_score,
+                        "quesited_strength": chart.planets[quesited_planet].strength_score,
+                        f"{item_name}_strength": chart.planets[item_significator].strength_score
                     },
                     "solar_factors": solar_factors
                 }
@@ -1284,8 +1289,8 @@ class EnhancedTraditionalHoraryJudgmentEngine:
                         "perfection_type": "prohibition",
                         "prohibiting_planet": prohibition_result["prohibiting_planet"].value,
                         "reception": prohibition_result.get("reception", "none"),
-                        "querent_strength": chart.planets[querent_planet].dignity_score,
-                        "quesited_strength": chart.planets[quesited_planet].dignity_score,
+                        "querent_strength": chart.planets[querent_planet].strength_score,
+                        "quesited_strength": chart.planets[quesited_planet].strength_score,
                     },
                     "solar_factors": solar_factors,
                 }
@@ -1299,8 +1304,8 @@ class EnhancedTraditionalHoraryJudgmentEngine:
                     "traditional_factors": {
                         "perfection_type": perfection.get("type", "direct_denied"),
                         "reception": perfection.get("reception", "none"),
-                        "querent_strength": chart.planets[querent_planet].dignity_score,
-                        "quesited_strength": chart.planets[quesited_planet].dignity_score,
+                        "querent_strength": chart.planets[querent_planet].strength_score,
+                        "quesited_strength": chart.planets[quesited_planet].strength_score,
                     },
                     "solar_factors": solar_factors,
                 }
@@ -1347,8 +1352,8 @@ class EnhancedTraditionalHoraryJudgmentEngine:
                 "traditional_factors": {
                     "perfection_type": perfection["type"],
                     "reception": perfection.get("reception", "none"),
-                    "querent_strength": chart.planets[querent_planet].dignity_score,
-                    "quesited_strength": chart.planets[quesited_planet].dignity_score
+                    "querent_strength": chart.planets[querent_planet].strength_score,
+                    "quesited_strength": chart.planets[quesited_planet].strength_score
                 },
                 "solar_factors": solar_factors
             }
@@ -1368,7 +1373,7 @@ class EnhancedTraditionalHoraryJudgmentEngine:
             prohibitions = []
             
             # Check for severe debilitation that could deny
-            if shared_position.dignity_score <= -10:
+            if shared_position.strength_score <= -10:
                 prohibitions.append("Shared significator severely debilitated")
             
             # Check for combustion (if not ignored)
@@ -1380,7 +1385,7 @@ class EnhancedTraditionalHoraryJudgmentEngine:
                 prohibitions.append("Shared significator combust/under beams")
             
             # Check for explicit refranation or frustration
-            if shared_position.retrograde and shared_position.dignity_score < -5:
+            if shared_position.retrograde and shared_position.strength_score < cfg().dignity.weak_limit:
                 prohibitions.append("Shared significator retrograde and weak (refranation)")
             
             # If explicit prohibitions exist, deny
@@ -1398,7 +1403,7 @@ class EnhancedTraditionalHoraryJudgmentEngine:
                     timing_description = "Delayed/with conditions"
                 
                 # Poor dignity indicates difficulty but not denial
-                if -10 < shared_position.dignity_score < 0:
+                if -10 < shared_position.strength_score < 0:
                     conditions.append("with difficulty")
                 
                 if conditions:
@@ -1469,12 +1474,16 @@ class EnhancedTraditionalHoraryJudgmentEngine:
                     # Moon as house ruler should be analyzed separately from general testimony
                     moon_as_ruler_condition = chart.planets[Planet.MOON]
                     
-                    if moon_as_ruler_condition.dignity_score >= 0:
+                    if moon_as_ruler_condition.strength_score >= 0:
                         base_confidence = min(88, base_confidence + 3)
-                        reasoning.append(f"Moon as L{',L'.join(map(str, relevant_moon_roles))} well-positioned supports perfection")
-                    elif moon_as_ruler_condition.dignity_score < -5:
+                        reasoning.append(
+                            f"Moon as L{',L'.join(map(str, relevant_moon_roles))} well-positioned supports perfection"
+                        )
+                    elif moon_as_ruler_condition.strength_score < cfg().dignity.weak_limit:
                         base_confidence = max(65, base_confidence - 5)
-                        reasoning.append(f"Moon as L{',L'.join(map(str, relevant_moon_roles))} poorly positioned creates uncertainty")
+                        reasoning.append(
+                            f"Moon as L{',L'.join(map(str, relevant_moon_roles))} poorly positioned creates uncertainty"
+                        )
                     
                     # For loan applications, L10 (authority) is especially important
                     if 10 in relevant_moon_roles:
@@ -1490,8 +1499,8 @@ class EnhancedTraditionalHoraryJudgmentEngine:
                 "traditional_factors": {
                     "perfection_type": "same_ruler_unity",
                     "reception": self._detect_reception_between_planets(chart, querent_planet, quesited_planet),
-                    "querent_strength": shared_position.dignity_score,
-                    "quesited_strength": shared_position.dignity_score,  # Same ruler = same strength
+                    "querent_strength": shared_position.strength_score,
+                    "quesited_strength": shared_position.strength_score,  # Same ruler = same strength
                     "moon_void": moon_testimony.get("void_of_course", False)
                 },
                 "solar_factors": solar_factors
@@ -1509,8 +1518,8 @@ class EnhancedTraditionalHoraryJudgmentEngine:
                     "traditional_factors": {
                         "perfection_type": "moon_next_aspect",
                         "reception": moon_next_aspect_result.get("reception", "none"),
-                        "querent_strength": chart.planets[querent_planet].dignity_score,
-                        "quesited_strength": chart.planets[quesited_planet].dignity_score,
+                        "querent_strength": chart.planets[querent_planet].strength_score,
+                        "quesited_strength": chart.planets[quesited_planet].strength_score,
                         "moon_void": moon_next_aspect_result.get("void_moon", False)
                     },
                     "solar_factors": solar_factors
@@ -1555,11 +1564,11 @@ class EnhancedTraditionalHoraryJudgmentEngine:
             quesited_pos = chart.planets[quesited_planet]
             
             # Check if quesited is severely debilitated
-            if quesited_pos.dignity_score <= -4 or quesited_pos.retrograde:
+            if quesited_pos.strength_score <= -4 or quesited_pos.retrograde:
                 # Severely weak quesited overrides benefic support
                 weakness_reasons = []
-                if quesited_pos.dignity_score <= -4:
-                    weakness_reasons.append(f"severely debilitated ({quesited_pos.dignity_score:+d})")
+                if quesited_pos.strength_score <= -4:
+                    weakness_reasons.append(f"severely debilitated ({quesited_pos.strength_score:+d})")
                 if quesited_pos.retrograde:
                     weakness_reasons.append("retrograde")
                 
@@ -1572,8 +1581,8 @@ class EnhancedTraditionalHoraryJudgmentEngine:
                     "timing": None,
                     "traditional_factors": {
                         "perfection_type": "none",
-                        "querent_strength": chart.planets[querent_planet].dignity_score,
-                        "quesited_strength": quesited_pos.dignity_score,
+                        "querent_strength": chart.planets[querent_planet].strength_score,
+                        "quesited_strength": quesited_pos.strength_score,
                         "reception": self._detect_reception_between_planets(chart, querent_planet, quesited_planet),
                         "benefic_noted": True
                     },
@@ -1593,8 +1602,8 @@ class EnhancedTraditionalHoraryJudgmentEngine:
                         "perfection_type": "none",
                         "benefic_noted": True,
                         "benefic_insufficient": True,
-                        "querent_strength": chart.planets[querent_planet].dignity_score,
-                        "quesited_strength": quesited_pos.dignity_score,
+                        "querent_strength": chart.planets[querent_planet].strength_score,
+                        "quesited_strength": quesited_pos.strength_score,
                         "reception": self._detect_reception_between_planets(chart, querent_planet, quesited_planet)
                     },
                     "solar_factors": solar_factors
@@ -1638,8 +1647,8 @@ class EnhancedTraditionalHoraryJudgmentEngine:
                     "traditional_factors": {
                         "perfection_type": "pregnancy_sufficiency",
                         "reception": reception,
-                        "querent_strength": chart.planets[querent_planet].dignity_score,
-                        "quesited_strength": chart.planets[quesited_planet].dignity_score,
+                        "querent_strength": chart.planets[querent_planet].strength_score,
+                        "quesited_strength": chart.planets[quesited_planet].strength_score,
                         "moon_benefic": has_moon_benefic
                     },
                     "solar_factors": solar_factors
@@ -1686,8 +1695,8 @@ class EnhancedTraditionalHoraryJudgmentEngine:
             "timing": None,
             "traditional_factors": {
                 "perfection_type": "none",
-                "querent_strength": chart.planets[querent_planet].dignity_score,
-                "quesited_strength": chart.planets[quesited_planet].dignity_score,
+                "querent_strength": chart.planets[querent_planet].strength_score,
+                "quesited_strength": chart.planets[quesited_planet].strength_score,
                 "reception": self._detect_reception_between_planets(chart, querent_planet, quesited_planet),
                 "benefic_noted": benefic_support.get("total_score", 0) > 0
             },
@@ -1749,7 +1758,7 @@ class EnhancedTraditionalHoraryJudgmentEngine:
             "timing": moon_testimony.get("timing", "Uncertain"),
             "traditional_factors": {
                 "moon_void": moon_testimony.get("void_of_course", False),
-                "significator_strength": f"Querent: {chart.planets[querent_planet].dignity_score:+d}, Quesited: {chart.planets[quesited_planet].dignity_score:+d}",
+                "significator_strength": f"Querent: {chart.planets[querent_planet].strength_score:+d}, Quesited: {chart.planets[quesited_planet].strength_score:+d}",
                 "moon_accidentals": {
                     "phase_bonus": self._moon_phase_bonus(chart),
                     "speed_bonus": self._moon_speed_bonus(chart),
@@ -1802,7 +1811,7 @@ class EnhancedTraditionalHoraryJudgmentEngine:
             travel_warnings = []
             
             # Critical: Jupiter retrograde for travel
-            if quesited_pos.retrograde and quesited_pos.dignity_score < 0:
+            if quesited_pos.retrograde and quesited_pos.strength_score < 0:
                 travel_warnings.append("Jupiter (travel ruler) retrograde and debilitated")
             
             # Jupiter in 6th house (illness during travel)  
@@ -1854,8 +1863,8 @@ class EnhancedTraditionalHoraryJudgmentEngine:
                                           querent: Planet, quesited: Planet, reasoning: List[str]) -> float:
         """CRITICAL FIX 2: Adjust confidence based on significator dignities"""
         
-        querent_dignity = chart.planets[querent].dignity_score
-        quesited_dignity = chart.planets[quesited].dignity_score
+        querent_dignity = chart.planets[querent].strength_score
+        quesited_dignity = chart.planets[quesited].strength_score
         
         # Quesited dignity is most critical for success
         if quesited_dignity <= -10:
@@ -1863,7 +1872,7 @@ class EnhancedTraditionalHoraryJudgmentEngine:
             penalty = 35
             confidence = max(confidence - penalty, 10)
             reasoning.append(f"🔴 Severely weak quesited ({quesited_dignity}): -{penalty}%")
-        elif quesited_dignity < -5:
+        elif quesited_dignity < cfg().dignity.weak_limit:
             # Moderately debilitated quesited
             penalty = 20
             confidence = max(confidence - penalty, 25)
@@ -2480,8 +2489,8 @@ class EnhancedTraditionalHoraryJudgmentEngine:
                 base_strength += 3
                 
         # Dignity bonus
-        if benefic_pos.dignity_score > 0:
-            base_strength += min(3, benefic_pos.dignity_score)
+        if benefic_pos.strength_score > 0:
+            base_strength += min(3, benefic_pos.strength_score)
             
         return max(0, base_strength)
     
@@ -2923,12 +2932,12 @@ class EnhancedTraditionalHoraryJudgmentEngine:
                         denial_reasons = []
                         if quesited_pos.house in cadent_houses:
                             denial_reasons.append(f"{quesited.value} in cadent {quesited_pos.house}th house")
-                        if quesited_pos.dignity_score < -5:
-                            denial_reasons.append(f"{quesited.value} severely weak (dignity {quesited_pos.dignity_score})")
+                        if quesited_pos.strength_score < cfg().dignity.weak_limit:
+                            denial_reasons.append(f"{quesited.value} severely weak (dignity {quesited_pos.strength_score})")
                         if querent_pos.house in cadent_houses:
                             denial_reasons.append(f"{querent.value} in cadent {querent_pos.house}th house")
-                        if querent_pos.dignity_score < -5:
-                            denial_reasons.append(f"{querent.value} severely weak (dignity {querent_pos.dignity_score})")
+                        if querent_pos.strength_score < cfg().dignity.weak_limit:
+                            denial_reasons.append(f"{querent.value} severely weak (dignity {querent_pos.strength_score})")
                         
                         if denial_reasons:
                             base_reason = f"{aspect_name} found but denied: {'; '.join(denial_reasons)} require reception for positive perfection"
@@ -3106,7 +3115,7 @@ class EnhancedTraditionalHoraryJudgmentEngine:
                 continue
             
             # Assess collector's condition and dignity
-            collector_strength = pos.dignity_score
+            collector_strength = pos.strength_score
             base_confidence = 60
             
             # Strong collector increases confidence
@@ -3386,9 +3395,10 @@ class EnhancedTraditionalHoraryJudgmentEngine:
         querent_cadent = querent_pos.house in cadent_houses
         quesited_cadent = quesited_pos.house in cadent_houses
         
-        # Check if either significator is severely weak (dignity < -5)
-        querent_weak = querent_pos.dignity_score < -5
-        quesited_weak = quesited_pos.dignity_score < -5
+        # Check if either significator is severely weak based on configured threshold
+        weak_limit = cfg().dignity.weak_limit
+        querent_weak = querent_pos.strength_score < weak_limit
+        quesited_weak = quesited_pos.strength_score < weak_limit
         
         # Traditional rule: cadent or weak significators need reception for positive perfection
         needs_reception = (querent_cadent or quesited_cadent or querent_weak or quesited_weak)
@@ -3480,8 +3490,10 @@ class EnhancedTraditionalHoraryJudgmentEngine:
         if quesited_planet == chart.house_rulers[2]:  # L2 question
             angularity = self.calculator._get_traditional_angularity(quesited_pos.longitude, chart.houses, quesited_pos.house)
             
-            if angularity == "cadent" and quesited_pos.dignity_score <= -5:
-                denial_reasons.append(f"L2 ({quesited_planet.value}) cadent and severely afflicted (dignity {quesited_pos.dignity_score}) - item likely destroyed/irretrievable")
+            if angularity == "cadent" and quesited_pos.strength_score <= cfg().dignity.weak_limit:
+                denial_reasons.append(
+                    f"L2 ({quesited_planet.value}) cadent and severely afflicted (dignity {quesited_pos.strength_score}) - item likely destroyed/irretrievable"
+                )
         
         # 2. Combustion of significators (traditional theft indicator)
         sun_pos = chart.planets[Planet.SUN]
@@ -3504,12 +3516,12 @@ class EnhancedTraditionalHoraryJudgmentEngine:
             denial_reasons.append("Saturn in 7th house - traditional denial of recovery")
         
         # 5. No translation or collection possible (significators too weak)
-        if querent_pos.dignity_score <= -8 and quesited_pos.dignity_score <= -8:
+        if querent_pos.strength_score <= -8 and quesited_pos.strength_score <= -8:
             denial_reasons.append("Both significators severely debilitated - no planetary strength for recovery")
         
         # 6. Mars (natural significator of theft) strongly placed but opposing recovery
         mars_pos = chart.planets[Planet.MARS]
-        if mars_pos.dignity_score >= 3:  # Well-dignified Mars
+        if mars_pos.strength_score >= 3:  # Well-dignified Mars
             # Check if Mars opposes the significators
             for sig_planet in [querent_planet, quesited_planet]:
                 sig_pos = chart.planets[sig_planet]
@@ -3756,6 +3768,7 @@ class HoraryEngine:
                             class PlanetPos:
                                 def __init__(self, data):
                                     self.dignity_score = data.get('dignity_score', 0)
+                                    self.strength_score = data.get('strength_score', self.dignity_score)
                                     self.house = data.get('house', 1)
                             self.planets[planet_name] = PlanetPos(planet_data)
                         self.houses = chart_data.get('houses', [])
@@ -3940,10 +3953,10 @@ class TraditionalOverrides:
             moon_to_querent.applying and moon_to_quesited.applying):
             
             # Check Moon's dignity (well-dignified Moon carries light better)
-            if moon_pos.dignity_score >= 0:  # At least neutral dignity
+            if moon_pos.strength_score >= 0:  # At least neutral dignity
                 return {
                     "clean": True,
-                    "reason": f"Moon (dignity {moon_pos.dignity_score:+d}) perfectly translates {moon_to_querent.aspect.value} {querent.value} then {moon_to_quesited.aspect.value} {quesited.value}"
+                    "reason": f"Moon (dignity {moon_pos.strength_score:+d}) perfectly translates {moon_to_querent.aspect.value} {querent.value} then {moon_to_quesited.aspect.value} {quesited.value}"
                 }
         
         return {"clean": False}

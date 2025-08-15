@@ -37,6 +37,7 @@ def serialize_planet_with_solar(
         "house": int(planet_pos.house),
         "sign": planet_pos.sign.sign_name,
         "dignity_score": int(planet_pos.dignity_score),
+        "strength_score": int(planet_pos.strength_score),
         "retrograde": bool(planet_pos.retrograde),
         "speed": float(planet_pos.speed),
         "degree_in_sign": float(planet_pos.longitude % 30),

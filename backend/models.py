@@ -97,6 +97,7 @@ class PlanetPosition:
     house: int
     sign: Sign
     dignity_score: int
+    strength_score: int = 0
     retrograde: bool = False
     speed: float = 0.0  # degrees per day
 

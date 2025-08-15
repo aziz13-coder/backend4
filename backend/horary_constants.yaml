@@ -154,6 +154,7 @@ dignity:
   speed_penalty: -1      # Slow/stationary planets penalty
   hayz_bonus: 2          # Proper sect bonus
   hayz_penalty: -1       # Wrong sect penalty
+  weak_limit: -5         # Threshold for severe debility
 
 # Retrograde handling
 retrograde:

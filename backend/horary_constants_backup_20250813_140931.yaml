@@ -134,6 +134,7 @@ dignity:
   angular: 1
   succedent: 0
   cadent: -1
+  weak_limit: -5
 
 # Retrograde handling
 retrograde:
