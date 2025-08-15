@@ -1499,26 +1499,21 @@ class EnhancedTraditionalHoraryJudgmentEngine:
         
         # 3.6. PRIORITY: Check Moon's next applying aspect to significators (traditional key indicator)
         moon_next_aspect_result = self._check_moon_next_aspect_to_significators(chart, querent_planet, quesited_planet, ignore_void_moon)
-        if moon_next_aspect_result["decisive"]:
-            if moon_next_aspect_result["result"] == "NO":
-                return {
-                    "result": "NO",
-                    "confidence": moon_next_aspect_result["confidence"],
-                    "reasoning": reasoning + [f"Moon's next aspect denies perfection: {moon_next_aspect_result['reason']}"],
-                    "timing": moon_next_aspect_result["timing"],
-                    "traditional_factors": {
-                        "perfection_type": "moon_next_aspect",
-                        "reception": moon_next_aspect_result.get("reception", "none"),
-                        "querent_strength": chart.planets[querent_planet].dignity_score,
-                        "quesited_strength": chart.planets[quesited_planet].dignity_score,
-                        "moon_void": moon_next_aspect_result.get("void_moon", False)
-                    },
-                    "solar_factors": solar_factors
-                }
-            else:
-                reasoning.append(
-                    f"Moon's next aspect supports but cannot perfect: {moon_next_aspect_result['reason']}"
-                )
+        # Only decisive if no other perfection exists
+        if perfection.get("perfects"):
+            moon_next_aspect_result["decisive"] = False
+
+        # Append Moon's testimony and adjust confidence instead of returning early
+        if moon_next_aspect_result["result"] == "NO":
+            reasoning.append(
+                f"Moon's next aspect denies perfection: {moon_next_aspect_result['reason']}"
+            )
+            confidence = min(confidence, moon_next_aspect_result["confidence"])
+        else:
+            reasoning.append(
+                f"Moon's next aspect supports but cannot perfect: {moon_next_aspect_result['reason']}"
+            )
+            confidence = min(confidence, moon_next_aspect_result["confidence"])
         
         # 3.7. Enhanced Moon testimony analysis when no decisive Moon aspect
         moon_testimony = self._check_enhanced_moon_testimony(chart, querent_planet, quesited_planet, ignore_void_moon)
