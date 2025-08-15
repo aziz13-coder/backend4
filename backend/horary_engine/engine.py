@@ -1508,29 +1508,43 @@ class EnhancedTraditionalHoraryJudgmentEngine:
         
         # 3.7. Enhanced Moon testimony analysis when no decisive Moon aspect
         moon_testimony = self._check_enhanced_moon_testimony(chart, querent_planet, quesited_planet, ignore_void_moon)
-        
+
+        # 3.8. Primary perfection gate check
+        primary_gate = self._primary_perfection_gate(chart, querent_planet, quesited_planet)
+        gate_passed = primary_gate.get("passes", False)
+        if gate_passed:
+            reasoning.append(f"Primary perfection gate: {primary_gate['reason']}")
+
         # 4. Enhanced denial conditions (retrograde now configurable)
         denial = self._check_enhanced_denial_conditions(chart, querent_planet, quesited_planet)
         if denial["denied"]:
-            return {
-                "result": "NO",
-                "confidence": min(confidence, denial["confidence"]),
-                "reasoning": reasoning + [f"🔴 Denial: {denial['reason']}"],
-                "timing": None,
-                "solar_factors": solar_factors
-            }
-        
+            if gate_passed:
+                reasoning.append(f"⚠️ Denial noted but gate overrides: {denial['reason']}")
+                confidence = min(confidence, denial["confidence"])
+            else:
+                return {
+                    "result": "NO",
+                    "confidence": min(confidence, denial["confidence"]),
+                    "reasoning": reasoning + [f"🔴 Denial: {denial['reason']}"],
+                    "timing": None,
+                    "solar_factors": solar_factors
+                }
+
         # 4.5. ENHANCED: Check theft/loss-specific denial factors
         theft_denials = self._check_theft_loss_specific_denials(chart, question_analysis.get("question_type"), querent_planet, quesited_planet)
         if theft_denials:
             combined_theft_denial = "; ".join(theft_denials)
-            return {
-                "result": "NO", 
-                "confidence": 80,  # High confidence for traditional theft denial factors
-                "reasoning": reasoning + [f"🔴 Theft/Loss Denial: {combined_theft_denial}"],
-                "timing": None,
-                "solar_factors": solar_factors
-            }
+            if gate_passed:
+                reasoning.append(f"⚠️ Theft/Loss denial noted but gate overrides: {combined_theft_denial}")
+                confidence = min(confidence, 80)
+            else:
+                return {
+                    "result": "NO",
+                    "confidence": 80,  # High confidence for traditional theft denial factors
+                    "reasoning": reasoning + [f"🔴 Theft/Loss Denial: {combined_theft_denial}"],
+                    "timing": None,
+                    "solar_factors": solar_factors
+                }
         
         # 5. ENHANCED: Check benefic aspects to significators - BUT ONLY as secondary testimony
         # Traditional rule: Benefic support alone cannot override lack of significator perfection
@@ -1539,7 +1553,7 @@ class EnhancedTraditionalHoraryJudgmentEngine:
         if benefic_support["favorable"]:
             # ROOT FIX: Add significator weakness assessment to benefic support logic
             quesited_pos = chart.planets[quesited_planet]
-            
+
             # Check if quesited is severely debilitated
             if quesited_pos.dignity_score <= -4 or quesited_pos.retrograde:
                 # Severely weak quesited overrides benefic support
@@ -1548,9 +1562,24 @@ class EnhancedTraditionalHoraryJudgmentEngine:
                     weakness_reasons.append(f"severely debilitated ({quesited_pos.dignity_score:+d})")
                 if quesited_pos.retrograde:
                     weakness_reasons.append("retrograde")
-                
+
                 reasoning.append(f"Note: {benefic_support['reason']} (insufficient - quesited {', '.join(weakness_reasons)})")
-                
+
+                if gate_passed:
+                    return {
+                        "result": "YES",
+                        "confidence": min(confidence, 80),
+                        "reasoning": reasoning + ["Primary gate holds despite weak quesited"],
+                        "timing": None,
+                        "traditional_factors": {
+                            "perfection_type": "none",
+                            "querent_strength": chart.planets[querent_planet].dignity_score,
+                            "quesited_strength": quesited_pos.dignity_score,
+                            "reception": self._detect_reception_between_planets(chart, querent_planet, quesited_planet),
+                            "benefic_noted": True
+                        },
+                        "solar_factors": solar_factors
+                    }
                 return {
                     "result": "NO",
                     "confidence": 80,
@@ -1568,7 +1597,24 @@ class EnhancedTraditionalHoraryJudgmentEngine:
             else:
                 # REMOVED: "benefic_only" path - Traditional horary requires significator perfection
                 reasoning.append(f"Note: {benefic_support['reason']} (insufficient - requires significator perfection)")
-                
+
+                if gate_passed:
+                    return {
+                        "result": "YES",
+                        "confidence": min(confidence, 85),
+                        "reasoning": reasoning + ["Primary gate holds despite lack of perfection"],
+                        "timing": None,
+                        "traditional_factors": {
+                            "perfection_type": "none",
+                            "benefic_noted": True,
+                            "benefic_insufficient": True,
+                            "querent_strength": chart.planets[querent_planet].dignity_score,
+                            "quesited_strength": quesited_pos.dignity_score,
+                            "reception": self._detect_reception_between_planets(chart, querent_planet, quesited_planet)
+                        },
+                        "solar_factors": solar_factors
+                    }
+
                 # No significator perfection = denial in traditional horary
                 return {
                     "result": "NO",
@@ -1664,7 +1710,23 @@ class EnhancedTraditionalHoraryJudgmentEngine:
         
         combined_denial = "; ".join(denial_reasons)
         reasoning.append(f"Denial: {combined_denial}")
-        
+
+        if gate_passed:
+            return {
+                "result": "YES",
+                "confidence": min(confidence, 75),
+                "reasoning": reasoning + ["Primary perfection gate prevents full denial"],
+                "timing": None,
+                "traditional_factors": {
+                    "perfection_type": "none",
+                    "querent_strength": chart.planets[querent_planet].dignity_score,
+                    "quesited_strength": chart.planets[quesited_planet].dignity_score,
+                    "reception": self._detect_reception_between_planets(chart, querent_planet, quesited_planet),
+                    "benefic_noted": benefic_support.get("total_score", 0) > 0
+                },
+                "solar_factors": solar_factors
+            }
+
         return {
             "result": "NO",
             "confidence": 75,
@@ -3166,6 +3228,41 @@ class EnhancedTraditionalHoraryJudgmentEngine:
                 }
         
         return {"found": False}
+
+    def _check_refranation(self, chart: HoraryChart, applying: Planet, target: Planet) -> Dict[str, Any]:
+        """Check if an applying planet refrains before perfection."""
+
+        aspect = self._find_applying_aspect(chart, applying, target)
+        if not aspect:
+            return {"found": False}
+
+        applying_pos = chart.planets[applying]
+        if applying_pos.retrograde:
+            return {
+                "found": True,
+                "confidence": cfg().confidence.denial.refranation,
+                "reason": f"{applying.value} retrograde prior to perfection"
+            }
+
+        return {"found": False}
+
+    def _primary_perfection_gate(self, chart: HoraryChart, querent: Planet, quesited: Planet) -> Dict[str, Any]:
+        """Gate ensuring L1 or Moon applies to quesited without early impediment."""
+
+        candidates = [(querent, "L1"), (Planet.MOON, "Moon")]
+        for planet, label in candidates:
+            aspect = self._find_applying_aspect(chart, planet, quesited)
+            if not aspect:
+                continue
+            if aspect["orb"] > aspect["aspect"].orb:
+                continue
+            if self._check_traditional_prohibition(chart, planet, quesited).get("found"):
+                continue
+            if self._check_refranation(chart, planet, quesited).get("found"):
+                continue
+            return {"passes": True, "reason": f"{label} applying {aspect['aspect'].value} {quesited.value}"}
+
+        return {"passes": False, "reason": "No primary applying aspect without impediment"}
     
     def _days_to_sign_exit(self, pos: PlanetPosition) -> float:
         """Calculate days until planet exits current sign"""

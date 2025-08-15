@@ -26,4 +26,10 @@ RULES: List[Dict[str, Optional[str]]] = [
         "description": "Rule that resolves its weight via a named function",
         "weight_fn": "dynamic_weight",
     },
+    {
+        "id": "PER_PRIMARY_GATE",
+        "description": "Primary perfection gate ensures L1 or Moon applies to quesited with no prohibition or refranation",
+        "weight": 1.0,
+        "gating": True,
+    },
 ]
