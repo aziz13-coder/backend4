@@ -68,6 +68,8 @@ moon:
   
   # Void-of-course configuration
   void_rule: "by_sign"  # "by_sign", "by_orb", "lilly"
+  void_gating: false  # R26 gating disabled in favor of confidence penalty
+  void_penalty: 10    # Confidence penalty applied when Moon is void-of-course
   void_exceptions:
     cancer: true     # Moon in Cancer not void even without aspects
     sagittarius: true # Moon in Sagittarius not void (traditional joy)
@@ -125,6 +127,7 @@ confidence:
 
 radicality:
   # Radicality checking parameters
+  gating: false  # R1 gating disabled in favor of confidence penalty
   asc_too_early: 3.0    # degrees
   asc_too_late: 27.0    # degrees
   saturn_7th_enabled: true  # check Saturn in 7th

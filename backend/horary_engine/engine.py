@@ -1081,6 +1081,8 @@ class EnhancedTraditionalHoraryJudgmentEngine:
         reasoning = []
         config = cfg()
         confidence = config.confidence.base_confidence
+        asc_penalty = 0
+        void_penalty = 0
         
         # 1. Enhanced radicality with configuration
         if not ignore_radicality:
@@ -1090,9 +1092,22 @@ class EnhancedTraditionalHoraryJudgmentEngine:
                 reason = radicality["reason"]
                 # Early or late Ascendant only gives a modest penalty
                 if "Ascendant too early" in reason or "Ascendant too late" in reason:
-                    penalty = getattr(config.radicality, "asc_warning_penalty", 15)
-                    confidence = max(confidence - penalty, 0)
+                    asc_penalty = getattr(config.radicality, "asc_warning_penalty", 15)
+                    if getattr(config.radicality, "gating", False):
+                        return {
+                            "result": "NO",
+                            "confidence": max(confidence - asc_penalty, 0),
+                            "reasoning": reasoning,
+                            "timing": None,
+                        }
                 else:
+                    if getattr(config.radicality, "gating", False):
+                        return {
+                            "result": "NO",
+                            "confidence": min(confidence, config.confidence.lunar_confidence_caps.neutral),
+                            "reasoning": reasoning,
+                            "timing": None,
+                        }
                     confidence = min(confidence, config.confidence.lunar_confidence_caps.neutral)
             else:
                 reasoning.append(f"Radicality: {radicality['reason']}")
@@ -1111,7 +1126,14 @@ class EnhancedTraditionalHoraryJudgmentEngine:
                         reasoning.append(f"⚠️  Void Moon noted but overridden: {override_check['reason']}")
                     else:
                         reasoning.append(f"⚠️  Void Moon: {void_check['reason']}")
-                confidence = min(confidence, config.confidence.lunar_confidence_caps.neutral)
+                void_penalty = getattr(config.moon, "void_penalty", 10)
+                if getattr(config.moon, "void_gating", False):
+                    return {
+                        "result": "NO",
+                        "confidence": max(confidence - void_penalty, 0),
+                        "reasoning": reasoning,
+                        "timing": None,
+                    }
         
         # 2. Identify significators
         significators = self._identify_significators(chart, question_analysis)
@@ -1365,6 +1387,9 @@ class EnhancedTraditionalHoraryJudgmentEngine:
                 reasoning.append(f"Perfection found: {perfection['reason']}")
             else:
                 reasoning.append(f"❌ Negative perfection: {perfection['reason']}")
+
+            # Apply consideration penalties (R1, R26) after perfection
+            confidence = max(confidence - asc_penalty - void_penalty, 0)
 
             # CRITICAL FIX 4: Apply confidence threshold (FIXED - low confidence should be NO/INCONCLUSIVE)
             result, confidence = self._apply_confidence_threshold(

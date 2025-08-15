@@ -74,9 +74,8 @@ def test_non_radical_chart_still_returns(monkeypatch):
 
     assert result["result"] == "YES"
     assert any("Ascendant" in r for r in result["reasoning"])
-    expected_confidence = min(
-        cfg().confidence.base_confidence - cfg().radicality.asc_warning_penalty,
-        cfg().confidence.perfection.direct_basic,
+    expected_confidence = (
+        cfg().confidence.perfection.direct_basic - cfg().radicality.asc_warning_penalty
     )
     assert result["confidence"] == expected_confidence
 
@@ -94,5 +93,8 @@ def test_void_moon_chart_still_returns(monkeypatch):
 
     assert result["result"] == "YES"
     assert any("Void Moon" in r for r in result["reasoning"])
-    assert result["confidence"] == cfg().confidence.lunar_confidence_caps.neutral
+    expected_confidence = (
+        cfg().confidence.perfection.direct_basic - cfg().moon.void_penalty
+    )
+    assert result["confidence"] == expected_confidence
 
