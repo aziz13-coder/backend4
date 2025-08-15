@@ -2361,8 +2361,8 @@ class EnhancedTraditionalHoraryJudgmentEngine:
     def _check_benefic_aspects_to_significators(self, chart: HoraryChart, querent_planet: Planet, quesited_planet: Planet) -> Dict[str, Any]:
         """ENHANCED: Check for beneficial aspects to significators (traditional hierarchy)"""
         
-        # Traditional benefics: Sun, Jupiter, Venus
-        benefics = [Planet.SUN, Planet.JUPITER, Planet.VENUS]
+        # Traditional benefics excluding the Sun (handled via R28 luminary rule)
+        benefics = [Planet.JUPITER, Planet.VENUS]
         significators = [querent_planet, quesited_planet]
         
         benefic_aspects = []
@@ -2473,11 +2473,7 @@ class EnhancedTraditionalHoraryJudgmentEngine:
         if benefic == Planet.JUPITER:
             base_strength += 2  # Greater benefic
         elif benefic == Planet.VENUS:
-            base_strength += 1  # Lesser benefic  
-        elif benefic == Planet.SUN:
-            base_strength += 3  # Especially good in 10th house for career
-            if benefic_pos.house == 10:  # Sun in 10th house
-                base_strength += 3
+            base_strength += 1  # Lesser benefic
                 
         # Dignity bonus
         if benefic_pos.dignity_score > 0:
