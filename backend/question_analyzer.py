@@ -1,4 +1,5 @@
 from typing import Dict, Any, List
+import re
 
 
 class TraditionalHoraryQuestionAnalyzer:
@@ -155,18 +156,17 @@ class TraditionalHoraryQuestionAnalyzer:
         timeframe_analysis = self._parse_question_timeframe(question_lower)
         
         # Determine question type
-        question_type = self._determine_question_type(question_lower)
-        
+        question_type, matched_pattern = self._determine_question_type(question_lower)
+
         # Determine primary houses involved (with house turning if needed)
         houses, possession_analysis = self._determine_houses(question_lower, question_type, third_person_analysis)
-        
+
         # Determine significators
         significators = self._determine_significators(houses, question_type, possession_analysis, third_person_analysis)
-        
-        # DEBUG: Log education questions to find the bug
-        if question_type == "education":
-            print(f"DEBUG: Education Q='{question}' 3rdPerson={third_person_analysis} Houses={houses} QuesitedH={significators.get('quesited_house')}")
-        
+
+        # DEBUG: Emit classification traceability information
+        print(f"DEBUG: category={question_type}, matched={matched_pattern}, houses={houses}")
+
         return {
             "question_type": question_type,
             "relevant_houses": houses,
@@ -258,16 +258,16 @@ class TraditionalHoraryQuestionAnalyzer:
         possession_indicators = ["property", "money", "possessions", "belongings", "assets"]
         if any(word in question_lower for word in possession_indicators):
             # Determine whose possessions - check for other people first, then default to querent
-            if any(word in question_lower for word in ["his ", "her ", "husband", "wife", "spouse"]):
+            if re.search(r"\b(his|her|husband|wife|spouse)\b", question_lower):
                 # Partner's possessions = 8th house (2nd from 7th)
                 return {"type": "money", "houses": [1, 7, 8]}  # Querent + partner + partner's possessions
-            elif any(word in question_lower for word in ["father", "dad"]):
-                # Father's possessions = 5th house (2nd from 4th) 
+            elif re.search(r"\b(father|dad)\b", question_lower):
+                # Father's possessions = 5th house (2nd from 4th)
                 return {"type": "money", "houses": [1, 4, 5]}
-            elif any(word in question_lower for word in ["mother", "mom"]):
+            elif re.search(r"\b(mother|mom)\b", question_lower):
                 # Mother's possessions = 11th house (2nd from 10th)
                 return {"type": "money", "houses": [1, 10, 11]}
-            elif any(phrase in question_lower for phrase in ["my ", "i ", "will i "]):
+            elif re.search(r"\b(my|i|will i)\b", question_lower):
                 return {"type": "money", "houses": [1, 2]}  # Querent's possessions
             else:
                 # Default: assume querent's possessions if no person specified
@@ -335,18 +335,18 @@ class TraditionalHoraryQuestionAnalyzer:
         
         return None
     
-    def _determine_question_type(self, question: str) -> str:
+    def _determine_question_type(self, question: str) -> tuple:
         """Enhanced question type determination with transaction and possession priority"""
         
         # PRIORITY 1: Financial transactions override relationship keywords
         transaction_words = ["sell", "buy", "purchase", "sale", "profit", "gain", "lose", "cost", "price", "payment", "trade", "exchange"]
         if any(word in question for word in transaction_words):
-            return "money"
+            return "money", [word for word in transaction_words if word in question]
         
         # PRIORITY 2: Possession/property questions override person keywords  
         possession_words = ["car", "house", "vehicle", "property", "possessions", "belongings", "assets", "furniture", "jewelry", "valuables"]
         if any(word in question for word in possession_words):
-            return "money"
+            return "money", [word for word in possession_words if word in question]
         
         # ENHANCED: Priority-based matching to handle overlapping keywords
         # Some words like "paralegal" contain "legal" but should match "education" not "lawsuit"
@@ -372,17 +372,17 @@ class TraditionalHoraryQuestionAnalyzer:
                 matches.append((q_type, matched_keywords))
         
         if not matches:
-            return "general"
-            
+            return "general", []
+
         # If only one match, return it
         if len(matches) == 1:
-            return matches[0][0]
+            return matches[0][0], matches[0][1]
             
         # ENHANCED: Handle multiple matches with priority logic
         # Priority 1: Education keywords take precedence over legal when both match
         education_match = None
         lawsuit_match = None
-        
+
         for q_type, matched_keywords in matches:
             if q_type == "education":
                 education_match = (q_type, matched_keywords)
@@ -394,14 +394,14 @@ class TraditionalHoraryQuestionAnalyzer:
             # Check for strong education indicators
             education_indicators = ["exam", "test", "student", "school", "college", "university", "pass", "graduate"]
             if any(indicator in question for indicator in education_indicators):
-                return "education"
+                return "education", education_match[1]
             # Check for strong legal indicators  
             legal_indicators = ["court", "lawsuit", "judge", "trial", "litigation", "case"]
             if any(indicator in question for indicator in legal_indicators):
-                return "lawsuit"
-        
+                return "lawsuit", lawsuit_match[1]
+
         # Default: return the first match (maintains original behavior for other cases)
-        return matches[0][0]
+        return matches[0][0], matches[0][1]
     
     def _determine_houses(self, question: str, question_type: str, third_person_analysis: Dict = None) -> tuple:
         """ENHANCED: Determine houses using comprehensive traditional horary rules"""
@@ -495,7 +495,7 @@ class TraditionalHoraryQuestionAnalyzer:
                 
                 houses = [1, student_house, prep_house, success_house]  # Querent, student, prep, success
                 
-            elif any(word in question for word in ["my", "i ", "will i"]):
+            elif re.search(r"\b(my|i|will i)\b", question):
                 houses.append(9)  # Querent's own education
             else:
                 houses.append(9)  # Default to 9th house for general education
@@ -532,17 +532,20 @@ class TraditionalHoraryQuestionAnalyzer:
             
         else:
             # Enhanced default logic - analyze question context
-            if any(word in question for word in ["other", "they", "he", "she", "person", "someone"]):
+            if re.search(r"\b(other|they|he|she|person|someone)\b", question):
                 houses.append(7)  # 7th house for other people
             else:
                 houses.append(7)  # Default fallback
-        
+
         # Look for specific house keywords (but not for general questions to avoid confusion)
         if question_type != "general":
             for house, keywords in self.house_meanings.items():
                 if house not in houses and any(keyword in question for keyword in keywords):
                     houses.append(house)
-        
+
+        if question_type == "general":
+            houses = [1, 7]
+
         return houses, None
     
     def _determine_significators(self, houses: List[int], question_type: str, possession_analysis: Dict = None, third_person_analysis: Dict = None) -> Dict[str, Any]:
