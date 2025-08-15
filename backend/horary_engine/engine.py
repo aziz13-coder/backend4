@@ -2976,21 +2976,21 @@ class EnhancedTraditionalHoraryJudgmentEngine:
         reception = self._check_enhanced_mutual_reception(chart, querent, quesited)
         if reception == "mutual_rulership":
             return {
-                "perfects": True,
+                "perfects": False,
                 "type": "reception",
                 "favorable": True,
                 "confidence": config.confidence.perfection.reception_only,
-                "reason": f"Reception: {self._format_reception_for_display(reception, querent, quesited, chart)} - unconditional perfection",
+                "reason": f"Reception: {self._format_reception_for_display(reception, querent, quesited, chart)} - needs aspect or translation",
                 "reception": reception
             }
         elif reception == "mutual_exaltation":
             boosted_confidence = min(100, config.confidence.perfection.reception_only + exaltation_confidence_boost)
             return {
-                "perfects": True,
+                "perfects": False,
                 "type": "reception",
                 "favorable": True,
                 "confidence": int(boosted_confidence),
-                "reason": f"Reception: {self._format_reception_for_display(reception, querent, quesited, chart)} (+{exaltation_confidence_boost}% confidence)",
+                "reason": f"Reception: {self._format_reception_for_display(reception, querent, quesited, chart)} (+{exaltation_confidence_boost}% confidence) - needs aspect or translation",
                 "reception": reception
             }
         
