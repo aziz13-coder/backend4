@@ -1275,8 +1275,20 @@ class EnhancedTraditionalHoraryJudgmentEngine:
             secondary_significator = significators["quesited"]  # Success
             reasoning.append(f"3rd person analysis: Student ({primary_significator.value}) seeking Success ({secondary_significator.value})")
         
-        perfection = self._check_enhanced_perfection(chart, primary_significator, secondary_significator,
-                                                   exaltation_confidence_boost)
+        # Only apply exaltation boost here if no later reception bonus will be added
+        applied_boost = exaltation_confidence_boost
+        reception_future = "none"
+        if significators.get("same_ruler_analysis") or question_analysis.get("question_type") == "pregnancy":
+            reception_future = self._detect_reception_between_planets(chart, primary_significator, secondary_significator)
+            if reception_future != "none":
+                applied_boost = 0
+
+        perfection = self._check_enhanced_perfection(
+            chart,
+            primary_significator,
+            secondary_significator,
+            applied_boost,
+        )
         # If a direct aspect exists, handle prohibition or immediate denial before considering Moon aspects
         if "aspect" in perfection:
             prohibition_result = self._check_traditional_prohibition(chart, primary_significator, secondary_significator)
@@ -1495,16 +1507,16 @@ class EnhancedTraditionalHoraryJudgmentEngine:
             moon_next_aspect_result["decisive"] = False
 
         # Append Moon's testimony and adjust confidence instead of returning early
-        if moon_next_aspect_result["result"] == "NO":
+        if moon_next_aspect_result.get("result") == "NO":
             reasoning.append(
-                f"Moon's next aspect denies perfection: {moon_next_aspect_result['reason']}"
+                f"Moon's next aspect denies perfection: {moon_next_aspect_result.get('reason', 'unspecified')}"
             )
-            confidence = min(confidence, moon_next_aspect_result["confidence"])
+            confidence = min(confidence, moon_next_aspect_result.get("confidence", confidence))
         else:
             reasoning.append(
-                f"Moon's next aspect supports but cannot perfect: {moon_next_aspect_result['reason']}"
+                f"Moon's next aspect supports but cannot perfect: {moon_next_aspect_result.get('reason', 'unspecified')}"
             )
-            confidence = min(confidence, moon_next_aspect_result["confidence"])
+            confidence = min(confidence, moon_next_aspect_result.get("confidence", confidence))
         
         # 3.7. Enhanced Moon testimony analysis when no decisive Moon aspect
         moon_testimony = self._check_enhanced_moon_testimony(chart, querent_planet, quesited_planet, ignore_void_moon)
@@ -2847,13 +2859,19 @@ class EnhancedTraditionalHoraryJudgmentEngine:
                 elif reception == "mutual_exaltation":
                     base_confidence = config.confidence.perfection.direct_with_mutual_exaltation
                     boosted_confidence = min(100, base_confidence + exaltation_confidence_boost)
-                    
+                    reason = (
+                        f"Direct perfection: {self._format_aspect_for_display(querent.value, direct_aspect['aspect'], quesited.value, True)} "
+                        f"with {self._format_reception_for_display(reception, querent, quesited, chart)}"
+                    )
+                    if exaltation_confidence_boost > 0:
+                        reason += f" (+{int(exaltation_confidence_boost)}% exaltation bonus)"
+
                     return {
                         "perfects": True,
                         "type": "direct",
                         "favorable": True,
                         "confidence": int(boosted_confidence),
-                        "reason": f"Direct perfection: {self._format_aspect_for_display(querent.value, direct_aspect['aspect'], quesited.value, True)} with {self._format_reception_for_display(reception, querent, quesited, chart)}",
+                        "reason": reason,
                         "reception": reception,
                         "aspect": direct_aspect
                     }
@@ -2939,12 +2957,16 @@ class EnhancedTraditionalHoraryJudgmentEngine:
             }
         elif reception == "mutual_exaltation":
             boosted_confidence = min(100, config.confidence.perfection.reception_only + exaltation_confidence_boost)
+            reason = f"Reception: {self._format_reception_for_display(reception, querent, quesited, chart)}"
+            if exaltation_confidence_boost > 0:
+                reason += f" (+{int(exaltation_confidence_boost)}% exaltation bonus)"
+            reason += " - needs aspect or translation"
             return {
                 "perfects": False,
                 "type": "reception",
                 "favorable": True,
                 "confidence": int(boosted_confidence),
-                "reason": f"Reception: {self._format_reception_for_display(reception, querent, quesited, chart)} (+{exaltation_confidence_boost}% confidence) - needs aspect or translation",
+                "reason": reason,
                 "reception": reception
             }
         
