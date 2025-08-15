@@ -1714,38 +1714,7 @@ class EnhancedTraditionalHoraryJudgmentEngine:
                 }
         
         return {"denied": False}
-    
-    def _apply_aspect_direction_adjustment(self, confidence: float, perfection: Dict, reasoning: List[str]) -> float:
-        """CRITICAL FIX 1: Adjust confidence based on applying vs separating aspects"""
-        
-        # Check if perfection involves separating aspects
-        if perfection["type"] == "direct" and "aspect" in perfection:
-            aspect_info = perfection["aspect"]
-            
-            if not aspect_info["applying"]:  # Separating aspect
-                penalty = 40  # Strong penalty for separating aspects
-                confidence = max(confidence - penalty, 15)  # Don't go below 15%
-                reasoning.append(f"🔴 Separating aspect: -{penalty}% (matter already past)")
-        
-        return confidence
-        return {
-            "result": result,
-            "confidence": confidence,
-            "reasoning": reasoning,
-            "timing": moon_testimony.get("timing", "Uncertain"),
-            "traditional_factors": {
-                "moon_void": moon_testimony.get("void_of_course", False),
-                "significator_strength": f"Querent: {chart.planets[querent_planet].dignity_score:+d}, Quesited: {chart.planets[quesited_planet].dignity_score:+d}",
-                "moon_accidentals": {
-                    "phase_bonus": self._moon_phase_bonus(chart),
-                    "speed_bonus": self._moon_speed_bonus(chart),
-                    "angularity_bonus": self._moon_angularity_bonus(chart)
-                }
-            },
-            "solar_factors": solar_factors
-        }
-    
-    
+
     def _check_enhanced_denial_conditions(self, chart: HoraryChart, querent: Planet, quesited: Planet) -> Dict[str, Any]:
         """Enhanced denial conditions with configurable retrograde handling"""
         
