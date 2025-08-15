@@ -12,7 +12,7 @@ Refactored with comprehensive configuration system and enhanced lunar calculatio
 import os
 import datetime
 import logging
-from typing import Dict, List, Optional, Any
+from typing import Dict, List, Optional, Any, Tuple
 
 # Configuration system
 from horary_config import get_config, cfg, HoraryError
@@ -1284,21 +1284,6 @@ class EnhancedTraditionalHoraryJudgmentEngine:
                         "perfection_type": "prohibition",
                         "prohibiting_planet": prohibition_result["prohibiting_planet"].value,
                         "reception": prohibition_result.get("reception", "none"),
-                        "querent_strength": chart.planets[querent_planet].dignity_score,
-                        "quesited_strength": chart.planets[quesited_planet].dignity_score,
-                    },
-                    "solar_factors": solar_factors,
-                }
-
-            if not perfection["perfects"]:
-                return {
-                    "result": "NO",
-                    "confidence": min(confidence, perfection.get("confidence", 75)),
-                    "reasoning": reasoning + [f"❌ Direct aspect denied: {perfection['reason']}",],
-                    "timing": None,
-                    "traditional_factors": {
-                        "perfection_type": perfection.get("type", "direct_denied"),
-                        "reception": perfection.get("reception", "none"),
                         "querent_strength": chart.planets[querent_planet].dignity_score,
                         "quesited_strength": chart.planets[quesited_planet].dignity_score,
                     },
@@ -2907,43 +2892,46 @@ class EnhancedTraditionalHoraryJudgmentEngine:
                         "aspect": direct_aspect
                     }
                 else:
-                    # FIXED: Check reception requirements for weak/cadent significators
-                    favorable = self._is_aspect_favorable_enhanced(direct_aspect["aspect"], reception, chart, querent, quesited)
-                    
-                    # Build clear reasoning message
+                    favorable, penalty_reasons = self._is_aspect_favorable_enhanced(
+                        direct_aspect["aspect"], reception, chart, querent, quesited
+                    )
+
                     aspect_name = direct_aspect['aspect'].display_name
                     base_reason = f"{aspect_name} between significators"
-                    
-                    if not favorable and reception == "none":
-                        # Explain WHY the aspect is denied
-                        querent_pos = chart.planets[querent]
-                        quesited_pos = chart.planets[quesited]
-                        cadent_houses = [3, 6, 9, 12]
-                        
-                        denial_reasons = []
-                        if quesited_pos.house in cadent_houses:
-                            denial_reasons.append(f"{quesited.value} in cadent {quesited_pos.house}th house")
-                        if quesited_pos.dignity_score < -5:
-                            denial_reasons.append(f"{quesited.value} severely weak (dignity {quesited_pos.dignity_score})")
-                        if querent_pos.house in cadent_houses:
-                            denial_reasons.append(f"{querent.value} in cadent {querent_pos.house}th house")
-                        if querent_pos.dignity_score < -5:
-                            denial_reasons.append(f"{querent.value} severely weak (dignity {querent_pos.dignity_score})")
-                        
-                        if denial_reasons:
-                            base_reason = f"{aspect_name} found but denied: {'; '.join(denial_reasons)} require reception for positive perfection"
-                        else:
+
+                    if favorable:
+                        confidence_value = config.confidence.perfection.direct_basic
+                        if penalty_reasons:
+                            confidence_value = max(confidence_value - 15, 0)
+                            base_reason = (
+                                f"{aspect_name} between significators but weakened: {', '.join(penalty_reasons)}"
+                            )
+                        return {
+                            "perfects": True,
+                            "type": "direct",
+                            "favorable": True,
+                            "confidence": confidence_value,
+                            "reason": base_reason,
+                            "reception": reception,
+                            "aspect": direct_aspect
+                        }
+                    else:
+                        if penalty_reasons:
+                            base_reason = (
+                                f"{aspect_name} found but denied: {'; '.join(penalty_reasons)} require reception for positive perfection"
+                            )
+                        elif reception == "none":
                             base_reason = f"{aspect_name} found but unfavorable without reception"
-                    
-                    return {
-                        "perfects": favorable,  # FIXED: Only true if actually favorable
-                        "type": "direct" if favorable else "direct_denied",
-                        "favorable": favorable,
-                        "confidence": config.confidence.perfection.direct_basic if favorable else 75,
-                        "reason": base_reason,
-                        "reception": reception,
-                        "aspect": direct_aspect
-                    }
+
+                        return {
+                            "perfects": False,
+                            "type": "direct_denied",
+                            "favorable": False,
+                            "confidence": 75,
+                            "reason": base_reason,
+                            "reception": reception,
+                            "aspect": direct_aspect
+                        }
         
         # CRITICAL FIX: Only check translation if NO direct aspect exists
         if not direct_aspect_found:
@@ -3365,46 +3353,38 @@ class EnhancedTraditionalHoraryJudgmentEngine:
         
         return base_favorable
     
-    def _is_aspect_favorable_enhanced(self, aspect: Aspect, reception: str, chart: HoraryChart, querent: Planet, quesited: Planet) -> bool:
-        """Enhanced aspect favorability with reception requirements for weak/cadent significators (FIXED)"""
+    def _is_aspect_favorable_enhanced(self, aspect: Aspect, reception: str, chart: HoraryChart, querent: Planet, quesited: Planet) -> Tuple[bool, List[str]]:
+        """Enhanced aspect favorability returning penalty reasons for weak/cadent conditions"""
         
         favorable_aspects = [Aspect.CONJUNCTION, Aspect.SEXTILE, Aspect.TRINE]
         unfavorable_aspects = [Aspect.SQUARE, Aspect.OPPOSITION]
         
         base_favorable = aspect in favorable_aspects
-        
-        # Mutual reception can overcome bad aspects
+
+        # Mutual reception can overcome bad aspects completely
         if reception in ["mutual_rulership", "mutual_exaltation", "mixed_reception"]:
-            return True
-        
-        # FIXED: Traditional requirement - cadent/weak significators need reception for positive perfection
+            return True, []
+
+        # Evaluate cadent/weak conditions for confidence penalties
         querent_pos = chart.planets[querent]
         quesited_pos = chart.planets[quesited]
-        
-        # Check if either significator is cadent (houses 3, 6, 9, 12)
+
         cadent_houses = [3, 6, 9, 12]
-        querent_cadent = querent_pos.house in cadent_houses
-        quesited_cadent = quesited_pos.house in cadent_houses
-        
-        # Check if either significator is severely weak (dignity < -5)
-        querent_weak = querent_pos.dignity_score < -5
-        quesited_weak = quesited_pos.dignity_score < -5
-        
-        # Traditional rule: cadent or weak significators need reception for positive perfection
-        needs_reception = (querent_cadent or quesited_cadent or querent_weak or quesited_weak)
-        
-        if needs_reception:
-            # If reception is required but absent, weaker aspects (sextile) become negative
-            if reception == "none":
-                if aspect == Aspect.SEXTILE:
-                    return False  # Sextile without reception from cadent/weak = negative
-                elif aspect in unfavorable_aspects:
-                    return False  # Square/opposition without reception = definitely negative
-                # Conjunction and trine might still work without reception if significators aren't too weak
-                elif aspect == Aspect.CONJUNCTION and (querent_weak or quesited_weak):
-                    return False  # Weak conjunction without reception = negative
-        
-        return base_favorable
+        penalty_reasons = []
+        if reception == "none":
+            if quesited_pos.house in cadent_houses:
+                penalty_reasons.append(f"{quesited.value} in cadent {quesited_pos.house}th house")
+            if quesited_pos.dignity_score < -5:
+                penalty_reasons.append(f"{quesited.value} severely weak (dignity {quesited_pos.dignity_score})")
+            if querent_pos.house in cadent_houses:
+                penalty_reasons.append(f"{querent.value} in cadent {querent_pos.house}th house")
+            if querent_pos.dignity_score < -5:
+                penalty_reasons.append(f"{querent.value} severely weak (dignity {querent_pos.dignity_score})")
+
+        if aspect in unfavorable_aspects:
+            return False, penalty_reasons
+
+        return base_favorable, penalty_reasons
     
     def _analyze_enhanced_solar_factors(self, chart: HoraryChart, querent: Planet, quesited: Planet, 
                                       ignore_combustion: bool = False) -> Dict:
