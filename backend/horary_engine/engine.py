@@ -1603,11 +1603,12 @@ class EnhancedTraditionalHoraryJudgmentEngine:
         # 5. ENHANCED: Check benefic aspects to significators - BUT ONLY as secondary testimony
         # Traditional rule: Benefic support alone cannot override lack of significator perfection
         benefic_support = self._check_benefic_aspects_to_significators(chart, querent_planet, quesited_planet)
-        
+        benefic_support_overridden = False
+
         if benefic_support["favorable"]:
             # ROOT FIX: Add significator weakness assessment to benefic support logic
             quesited_pos = chart.planets[quesited_planet]
-            
+
             # Check if quesited is severely debilitated
             if quesited_pos.dignity_score <= -4 or quesited_pos.retrograde:
                 # Severely weak quesited overrides benefic support
@@ -1616,43 +1617,12 @@ class EnhancedTraditionalHoraryJudgmentEngine:
                     weakness_reasons.append(f"severely debilitated ({quesited_pos.dignity_score:+d})")
                 if quesited_pos.retrograde:
                     weakness_reasons.append("retrograde")
-                
+
                 reasoning.append(f"Note: {benefic_support['reason']} (insufficient - quesited {', '.join(weakness_reasons)})")
-                
-                return {
-                    "result": "NO",
-                    "confidence": 80,
-                    "reasoning": reasoning + ["No significator perfection and weak quesited confirms denial"],
-                    "timing": None,
-                    "traditional_factors": {
-                        "perfection_type": "none",
-                        "querent_strength": chart.planets[querent_planet].dignity_score,
-                        "quesited_strength": quesited_pos.dignity_score,
-                        "reception": self._detect_reception_between_planets(chart, querent_planet, quesited_planet),
-                        "benefic_noted": True
-                    },
-                    "solar_factors": solar_factors
-                }
+                benefic_support_overridden = True
             else:
-                # REMOVED: "benefic_only" path - Traditional horary requires significator perfection
-                reasoning.append(f"Note: {benefic_support['reason']} (insufficient - requires significator perfection)")
-                
-                # No significator perfection = denial in traditional horary
-                return {
-                    "result": "NO",
-                    "confidence": 85,  # High confidence for traditional denial
-                    "reasoning": reasoning + ["No perfection between significators - traditional denial"],
-                    "timing": None,
-                    "traditional_factors": {
-                        "perfection_type": "none",
-                        "benefic_noted": True,
-                        "benefic_insufficient": True,
-                        "querent_strength": chart.planets[querent_planet].dignity_score,
-                        "quesited_strength": quesited_pos.dignity_score,
-                        "reception": self._detect_reception_between_planets(chart, querent_planet, quesited_planet)
-                    },
-                    "solar_factors": solar_factors
-                }
+                # Traditional horary: benefic support noted but not decisive
+                reasoning.append(f"Note: {benefic_support['reason']} (secondary testimony)")
         
         # 6. PREGNANCY-SPECIFIC: Check for Moon→benefic OR L1↔L5 reception (FIXED: don't auto-deny)
         if question_analysis.get("question_type") == "pregnancy":
@@ -1733,9 +1703,15 @@ class EnhancedTraditionalHoraryJudgmentEngine:
         combined_denial = "; ".join(denial_reasons)
         reasoning.append(f"Denial: {combined_denial}")
         
+        final_confidence = min(confidence, 75)
+        if moon_next_aspect_result.get("result") == "YES" or (
+            benefic_support.get("favorable") and not benefic_support_overridden
+        ):
+            final_confidence = min(final_confidence, 60)
+
         return {
             "result": "NO",
-            "confidence": 75,
+            "confidence": final_confidence,
             "reasoning": reasoning,
             "timing": None,
             "traditional_factors": {
