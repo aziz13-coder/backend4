@@ -2010,7 +2010,8 @@ class EnhancedTraditionalHoraryJudgmentEngine:
                 
             # Assess favorability based on aspect quality
             favorable = True
-            if querent_aspect.aspect in ["Square", "Opposition"] or quesited_aspect.aspect in ["Square", "Opposition"]:
+            hard = {Aspect.SQUARE, Aspect.OPPOSITION}
+            if (querent_aspect.aspect in hard) or (quesited_aspect.aspect in hard):
                 favorable = False  # Hard aspects make translation strained
                 confidence -= 5
             
