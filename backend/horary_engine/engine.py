@@ -1317,8 +1317,8 @@ class EnhancedTraditionalHoraryJudgmentEngine:
             confidence = self._apply_dignity_confidence_adjustment(confidence, chart, querent_planet, quesited_planet, reasoning)
             
             # Clear step-by-step traditional reasoning
-            if perfection["type"] == "direct_denied":
-                reasoning.append(f"❌ Direct aspect denied: {perfection['reason']}")
+            if perfection["type"] == "direct_penalized":
+                reasoning.append(f"⚠️ Direct aspect penalized: {perfection['reason']}")
             elif perfection["favorable"]:
                 reasoning.append(f"Perfection found: {perfection['reason']}")
             else:
@@ -2884,16 +2884,18 @@ class EnhancedTraditionalHoraryJudgmentEngine:
                     else:
                         if penalty_reasons:
                             base_reason = (
-                                f"{aspect_name} found but denied: {'; '.join(penalty_reasons)} require reception for positive perfection"
+                                f"{aspect_name} penalized: {'; '.join(penalty_reasons)}"
                             )
                         elif reception == "none":
-                            base_reason = f"{aspect_name} found but unfavorable without reception"
+                            base_reason = f"{aspect_name} lacks reception"
+                        else:
+                            base_reason = f"{aspect_name} unfavorable"
 
                         return {
-                            "perfects": False,
-                            "type": "direct_denied",
+                            "perfects": True,
+                            "type": "direct_penalized",
                             "favorable": False,
-                            "confidence": 75,
+                            "confidence": max(config.confidence.perfection.direct_basic - 25, 0),
                             "reason": base_reason,
                             "reception": reception,
                             "aspect": direct_aspect

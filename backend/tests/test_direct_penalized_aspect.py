@@ -4,19 +4,19 @@ import datetime
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
+from horary_config import cfg
 from horary_engine import engine as engine_module
 from horary_engine.engine import EnhancedTraditionalHoraryJudgmentEngine
 from models import HoraryChart, Planet, Sign, PlanetPosition
-from horary_config import cfg
 
 
 def make_chart():
     now = datetime.datetime.utcnow()
     planets = {
-        Planet.MERCURY: PlanetPosition(Planet.MERCURY, 0, 0, 1, Sign.SAGITTARIUS, 0),
-        Planet.JUPITER: PlanetPosition(Planet.JUPITER, 0, 0, 7, Sign.GEMINI, 0),
+        Planet.MERCURY: PlanetPosition(Planet.MERCURY, 0, 0, 1, Sign.ARIES, 0),
+        Planet.JUPITER: PlanetPosition(Planet.JUPITER, 0, 0, 7, Sign.LIBRA, 0),
+        Planet.MOON: PlanetPosition(Planet.MOON, 0, 0, 3, Sign.GEMINI, 0),
         Planet.SUN: PlanetPosition(Planet.SUN, 0, 0, 4, Sign.CANCER, 0),
-        Planet.MOON: PlanetPosition(Planet.MOON, 0, 0, 3, Sign.ARIES, 0),
     }
     houses = [i * 30 for i in range(12)]
     house_rulers = {1: Planet.MERCURY, 7: Planet.JUPITER}
@@ -35,10 +35,7 @@ def make_chart():
     )
 
 
-def test_mutual_reception_without_connection(monkeypatch):
-    engine = EnhancedTraditionalHoraryJudgmentEngine()
-    chart = make_chart()
-
+def patch_engine(engine, monkeypatch):
     def fake_identify_significators(chart, qa):
         return {
             "valid": True,
@@ -48,43 +45,38 @@ def test_mutual_reception_without_connection(monkeypatch):
         }
 
     monkeypatch.setattr(engine, "_identify_significators", fake_identify_significators)
-    monkeypatch.setattr(
-        engine_module,
-        "check_enhanced_radicality",
-        lambda c, ignore=False: {"valid": True, "reason": "radical"},
-    )
+    monkeypatch.setattr(engine, "_analyze_enhanced_solar_factors", lambda *a, **k: {"significant": False})
     monkeypatch.setattr(
         engine,
-        "_is_moon_void_of_course_enhanced",
-        lambda c: {"void": False, "exception": False, "reason": ""},
-    )
-    monkeypatch.setattr(
-        engine,
-        "_analyze_enhanced_solar_factors",
-        lambda *a, **k: {"significant": False},
+        "_check_enhanced_perfection",
+        lambda *a, **k: {
+            "perfects": True,
+            "favorable": False,
+            "confidence": cfg().confidence.perfection.direct_basic - 25,
+            "type": "direct_penalized",
+            "reason": "test penalty",
+            "reception": "none",
+        },
     )
     monkeypatch.setattr(engine, "_apply_aspect_direction_adjustment", lambda c, p, r: c)
     monkeypatch.setattr(engine, "_apply_dignity_confidence_adjustment", lambda c, ch, q, qs, r: c)
     monkeypatch.setattr(engine, "_apply_retrograde_quesited_penalty", lambda c, ch, q, r: c)
+    monkeypatch.setattr(engine, "_apply_confidence_threshold", lambda res, conf, reasoning: (res, conf))
     monkeypatch.setattr(engine, "_calculate_enhanced_timing", lambda *a, **k: None)
-    monkeypatch.setattr(engine, "_check_enhanced_moon_testimony", lambda *a, **k: {})
-    monkeypatch.setattr(engine, "_check_enhanced_denial_conditions", lambda *a, **k: {"denied": False})
-    monkeypatch.setattr(
-        engine,
-        "_check_moon_next_aspect_to_significators",
-        lambda *a, **k: {
-            "decisive": False,
-            "result": "UNKNOWN",
-            "reason": "",
-            "confidence": cfg().confidence.base_confidence,
-        },
-    )
-    monkeypatch.setattr(engine, "_check_benefic_aspects_to_significators", lambda *a, **k: {"favorable": False})
+    monkeypatch.setattr(engine, "_check_traditional_prohibition", lambda *a, **k: {"found": False})
+    monkeypatch.setattr(engine, "_check_moon_sun_education_perfection", lambda *a, **k: {"perfects": False})
+    monkeypatch.setattr(engine_module, "check_enhanced_radicality", lambda c, ignore=False: {"valid": True, "reason": "radical"})
+    monkeypatch.setattr(engine, "_is_moon_void_of_course_enhanced", lambda c: {"void": False, "exception": False, "reason": ""})
 
-    perfection = engine._check_enhanced_perfection(chart, Planet.MERCURY, Planet.JUPITER)
-    assert perfection["reception"] == "mutual_rulership"
-    assert not perfection["perfects"]
 
+def test_direct_penalized_results_in_no(monkeypatch):
+    engine = EnhancedTraditionalHoraryJudgmentEngine()
+    patch_engine(engine, monkeypatch)
+
+    chart = make_chart()
     result = engine._apply_enhanced_judgment(chart, {})
+
     assert result["result"] == "NO"
+    assert result["confidence"] == cfg().confidence.perfection.direct_basic - 25
+    assert any("penalized" in r for r in result["reasoning"])
 
