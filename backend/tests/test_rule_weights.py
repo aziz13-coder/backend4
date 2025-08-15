@@ -29,3 +29,8 @@ def test_dump_resolves_weights_and_consumer_works():
     # Consumer should apply weights correctly
     assert apply_rule('static', 10) == 10 * weight_map['static']
     assert apply_rule('dynamic', 10) == 10 * weight_map['dynamic']
+
+
+def test_extreme_combustion_rule_gating_default_false():
+    rule = next(r for r in rules.RULES if r['id'] == 'solar_extreme_combustion_denial')
+    assert rule.get('gating') is False

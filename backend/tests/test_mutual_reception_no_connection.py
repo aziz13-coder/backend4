@@ -66,9 +66,18 @@ def test_mutual_reception_without_connection(monkeypatch):
     monkeypatch.setattr(engine, "_apply_dignity_confidence_adjustment", lambda c, ch, q, qs, r: c)
     monkeypatch.setattr(engine, "_apply_retrograde_quesited_penalty", lambda c, ch, q, r: c)
     monkeypatch.setattr(engine, "_calculate_enhanced_timing", lambda *a, **k: None)
-    monkeypatch.setattr(engine, "_check_enhanced_moon_testimony", lambda *a, **k: {})
+    monkeypatch.setattr(engine, "_check_enhanced_moon_testimony", lambda *a, **k: {"reason": "", "aspects": []})
     monkeypatch.setattr(engine, "_check_enhanced_denial_conditions", lambda *a, **k: {"denied": False})
-    monkeypatch.setattr(engine, "_check_moon_next_aspect_to_significators", lambda *a, **k: {"decisive": False})
+    monkeypatch.setattr(
+        engine,
+        "_check_moon_next_aspect_to_significators",
+        lambda *a, **k: {
+            "decisive": False,
+            "result": "YES",
+            "reason": "",
+            "confidence": 100,
+        },
+    )
     monkeypatch.setattr(engine, "_check_benefic_aspects_to_significators", lambda *a, **k: {"favorable": False})
 
     perfection = engine._check_enhanced_perfection(chart, Planet.MERCURY, Planet.JUPITER)

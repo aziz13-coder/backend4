@@ -26,4 +26,10 @@ RULES: List[Dict[str, Optional[str]]] = [
         "description": "Rule that resolves its weight via a named function",
         "weight_fn": "dynamic_weight",
     },
+    {
+        "id": "solar_extreme_combustion_denial",
+        "description": "Denial for unsupported cadent planet under extreme combustion",
+        "weight": 1.0,
+        "gating": False,
+    },
 ]

@@ -28,6 +28,7 @@ orbs:
   cazimi_orb_arcmin: 17  # arcminutes
   combustion_orb: 8.5    # degrees
   under_beams_orb: 15.0  # degrees
+  extreme_combustion_arcmin: 60  # arcminutes for denial gating
   
   # Void-of-course orbs by method
   void_orb_deg: 1.0  # for "by_orb" method
@@ -136,7 +137,11 @@ dignity:
   cadent: -1
 
 # Retrograde handling
-retrograde:
-  automatic_denial: false  # Don't automatically deny for retrograde
-  dignity_penalty: -2     # Penalty for retrograde significator
-  frustration_penalty: -5 # Additional penalty for retrograde frustration
+  retrograde:
+    automatic_denial: false  # Don't automatically deny for retrograde
+    dignity_penalty: -2     # Penalty for retrograde significator
+    frustration_penalty: -5 # Additional penalty for retrograde frustration
+    quesited_penalty: 12    # Confidence penalty for retrograde quesited (mitigable)
+
+solar:
+  extreme_combustion_denial_enabled: false  # Toggle for extreme combustion denial

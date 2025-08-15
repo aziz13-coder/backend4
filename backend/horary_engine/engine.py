@@ -1154,20 +1154,24 @@ class EnhancedTraditionalHoraryJudgmentEngine:
         # Enhanced solar condition analysis
         solar_factors = self._analyze_enhanced_solar_factors(
             chart, querent_planet, quesited_planet, ignore_combustion)
-        
+        solar_factors["penalty_codes"] = []
+
         if solar_factors["significant"]:
             # Don't add generic solar conditions message - will be added below with context
             solar_config = getattr(config, "solar", None)
-            r17b_enabled = getattr(solar_config, "severe_impediment_denial_enabled", False) if solar_config else False
+            extreme_denial_enabled = getattr(solar_config, "extreme_combustion_denial_enabled", False) if solar_config else False
 
             # ENHANCED: Adjust confidence based on solar conditions affecting SIGNIFICATORS
             if solar_factors["cazimi_count"] > 0:
                 confidence += config.confidence.solar.cazimi_bonus
                 reasoning.append("Cazimi planets significantly strengthen the judgment")
             elif (solar_factors["combustion_count"] > 0 or solar_factors["under_beams_count"] > 0) and not ignore_combustion:
-                penalty_reasons = []
+                penalty_reasons: List[str] = []
                 solar_penalty = 0
-                severe_impediments = 0
+                extreme_denial_planet = None
+                extreme_distance = 0.0
+                solar_penalty_codes: List[str] = []
+                extreme_arcmin = getattr(config.orbs, "extreme_combustion_arcmin", 60)
 
                 for planet in [querent_planet, quesited_planet]:
                     planet_analysis = solar_factors["detailed_analyses"].get(planet.value, {})
@@ -1179,8 +1183,8 @@ class EnhancedTraditionalHoraryJudgmentEngine:
                     planet_dignity = chart.planets[planet].dignity_score
 
                     if condition == "Combustion":
+                        solar_penalty_codes.append("SOL_COMBUSTION_MAJOR")
                         if distance < 1.0:
-                            severe_impediments += 1
                             solar_penalty += 40
                             reason = f"{planet.value} (extreme combustion at {distance:.1f}°)"
                         elif distance < 2.0:
@@ -1193,34 +1197,49 @@ class EnhancedTraditionalHoraryJudgmentEngine:
                             solar_penalty += 10
                             reason = f"{planet.value} (light combustion at {distance:.1f}°)"
 
-                        if planet_dignity <= -4 and distance < 3.0:
-                            severe_impediments += 1
-                            reason += f" (also severely debilitated: {planet_dignity:+d})"
-
                         penalty_reasons.append(reason)
 
+                        if extreme_denial_enabled and distance * 60 < extreme_arcmin:
+                            planet_pos = chart.planets[planet]
+                            if planet_pos.house in [3, 6, 9, 12]:
+                                other = quesited_planet if planet == querent_planet else querent_planet
+                                has_reception = self._detect_reception_between_planets(chart, planet, other) != "none"
+                                has_aspect = any(
+                                    (a.planet1 == planet and a.planet2 == other or a.planet1 == other and a.planet2 == planet)
+                                    and a.applying for a in chart.aspects
+                                )
+                                if not has_reception and not has_aspect:
+                                    extreme_denial_planet = planet
+                                    extreme_distance = distance
+
                     elif condition == "Under the Beams":
+                        solar_penalty_codes.append("SOL_COMBUSTION_MINOR")
                         solar_penalty += config.confidence.solar.under_beams_penalty
                         penalty_reasons.append(f"{planet.value} under beams")
 
-                if r17b_enabled and severe_impediments >= 2:
-                    return {
-                        "result": "NO",
-                        "confidence": 90,
-                        "reasoning": reasoning + [f"🔴 Multiple severe solar impediments deny perfection: {', '.join(penalty_reasons)}"],
-                        "timing": None,
-                        "traditional_factors": {
-                            "perfection_type": "impediment_denial",
-                            "impediment_type": "severe_combustion_and_debilitation"
-                        },
-                        "solar_factors": solar_factors,
-                    }
+                solar_factors["penalty_codes"] = solar_penalty_codes
 
                 if penalty_reasons:
                     confidence -= min(solar_penalty, 50)
                     reasoning.append(f"🔴 Solar impediment: {', '.join(penalty_reasons)}")
                 else:
                     reasoning.append(f"🟡 Solar conditions: {solar_factors['summary']} (significators unaffected)")
+
+                if extreme_denial_enabled and extreme_denial_planet:
+                    reasoning.append(
+                        f"🔴 Extreme combustion: {extreme_denial_planet.value} at {extreme_distance:.1f}° cadent and unsupported"
+                    )
+                    return {
+                        "result": "NO",
+                        "confidence": 90,
+                        "reasoning": reasoning,
+                        "timing": None,
+                        "traditional_factors": {
+                            "perfection_type": "impediment_denial",
+                            "impediment_type": "extreme_combustion",
+                        },
+                        "solar_factors": solar_factors,
+                    }
         
         # 3. Enhanced perfection check with transaction support
         # CRITICAL FIX: Handle transaction questions with natural significators
@@ -3414,6 +3433,11 @@ class EnhancedTraditionalHoraryJudgmentEngine:
         # Convert detailed analyses for JSON serialization
         detailed_analyses_serializable = {}
         for planet, analysis in solar_analyses.items():
+            penalty_code = None
+            if analysis.condition == SolarCondition.COMBUSTION and not ignore_combustion:
+                penalty_code = "SOL_COMBUSTION_MAJOR"
+            elif analysis.condition == SolarCondition.UNDER_BEAMS and not ignore_combustion:
+                penalty_code = "SOL_COMBUSTION_MINOR"
             detailed_analyses_serializable[planet.value] = {
                 "planet": planet.value,
                 "distance_from_sun": round(analysis.distance_from_sun, 4),
@@ -3422,7 +3446,8 @@ class EnhancedTraditionalHoraryJudgmentEngine:
                 "description": analysis.condition.description,
                 "exact_cazimi": bool(analysis.exact_cazimi),
                 "traditional_exception": bool(analysis.traditional_exception),
-                "effect_ignored": ignore_combustion and analysis.condition in [SolarCondition.COMBUSTION, SolarCondition.UNDER_BEAMS]
+                "effect_ignored": ignore_combustion and analysis.condition in [SolarCondition.COMBUSTION, SolarCondition.UNDER_BEAMS],
+                "penalty_code": penalty_code,
             }
         
         return {

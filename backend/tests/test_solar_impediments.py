@@ -12,13 +12,13 @@ from horary_engine.engine import EnhancedTraditionalHoraryJudgmentEngine
 from models import HoraryChart, Planet, Sign, PlanetPosition
 
 
-def make_chart(mercury_dignity=0):
+def make_chart(mercury_dignity=0, mercury_house=1, sun_house=4):
     now = datetime.datetime.utcnow()
     planets = {
-        Planet.MERCURY: PlanetPosition(Planet.MERCURY, 0, 0, 1, Sign.ARIES, mercury_dignity),
+        Planet.MERCURY: PlanetPosition(Planet.MERCURY, 0, 0, mercury_house, Sign.ARIES, mercury_dignity),
         Planet.JUPITER: PlanetPosition(Planet.JUPITER, 0, 0, 7, Sign.LIBRA, 0),
         Planet.MOON: PlanetPosition(Planet.MOON, 0, 0, 3, Sign.GEMINI, 0),
-        Planet.SUN: PlanetPosition(Planet.SUN, 0, 0, 4, Sign.CANCER, 0),
+        Planet.SUN: PlanetPosition(Planet.SUN, 0, 0, sun_house, Sign.CANCER, 0),
     }
     houses = [i * 30 for i in range(12)]
     house_rulers = {1: Planet.MERCURY, 7: Planet.JUPITER}
@@ -63,6 +63,7 @@ def setup_engine(engine, monkeypatch, solar_factors):
     monkeypatch.setattr(engine, "_calculate_enhanced_timing", lambda *a, **k: None)
     monkeypatch.setattr(engine, "_check_traditional_prohibition", lambda *a, **k: {"found": False})
     monkeypatch.setattr(engine, "_check_moon_sun_education_perfection", lambda *a, **k: {"perfects": False})
+    monkeypatch.setattr(engine, "_detect_reception_between_planets", lambda *a, **k: "none")
 
 
 def test_under_beams_penalty_applied(monkeypatch):
@@ -83,9 +84,11 @@ def test_under_beams_penalty_applied(monkeypatch):
                 "exact_cazimi": False,
                 "traditional_exception": False,
                 "effect_ignored": False,
+                "penalty_code": "SOL_COMBUSTION_MINOR",
             }
         },
         "combustion_ignored": False,
+        "penalty_codes": ["SOL_COMBUSTION_MINOR"],
     }
     chart = make_chart()
     setup_engine(engine, monkeypatch, solar_factors)
@@ -97,7 +100,7 @@ def test_under_beams_penalty_applied(monkeypatch):
     assert result["confidence"] == expected_confidence
 
 
-def test_severe_impediment_denial_toggle(monkeypatch):
+def test_extreme_combustion_denial_toggle(monkeypatch):
     engine = EnhancedTraditionalHoraryJudgmentEngine()
     solar_factors = {
         "significant": True,
@@ -115,20 +118,22 @@ def test_severe_impediment_denial_toggle(monkeypatch):
                 "exact_cazimi": False,
                 "traditional_exception": False,
                 "effect_ignored": False,
+                "penalty_code": "SOL_COMBUSTION_MAJOR",
             }
         },
         "combustion_ignored": False,
+        "penalty_codes": ["SOL_COMBUSTION_MAJOR"],
     }
-    chart = make_chart(mercury_dignity=-5)
+    chart = make_chart(mercury_dignity=-5, mercury_house=3, sun_house=10)
     setup_engine(engine, monkeypatch, solar_factors)
 
-    original = cfg().solar.severe_impediment_denial_enabled
+    original_flag = cfg().solar.extreme_combustion_denial_enabled
     try:
-        cfg().solar.severe_impediment_denial_enabled = True
+        cfg().solar.extreme_combustion_denial_enabled = True
         result = engine._apply_enhanced_judgment(chart, {})
     finally:
-        cfg().solar.severe_impediment_denial_enabled = original
+        cfg().solar.extreme_combustion_denial_enabled = original_flag
 
     assert result["result"] == "NO"
-    assert any("severe solar impediments" in r for r in result["reasoning"])
+    assert any("extreme combustion" in r.lower() for r in result["reasoning"])
     assert result["confidence"] == 90
