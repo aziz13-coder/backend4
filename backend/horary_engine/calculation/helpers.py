@@ -242,22 +242,32 @@ def sun_altitude_at_civil_twilight(latitude: float, longitude: float,
     
     Returns:
         Sun's altitude in degrees (negative below horizon)
-    
+
     Classical source: Al-Biruni - planetary visibility and heliacal risings
     """
     try:
-        # Calculate Sun position
+        # Calculate ecliptic position of the Sun
         sun_data, _ = swe.calc_ut(jd_ut, swe.SUN, swe.FLG_SWIEPH)
         sun_longitude = sun_data[0]
         sun_latitude = sun_data[1]
-        
-        # Convert to horizontal coordinates would require more complex calc
-        # For simplicity, approximate using -8° as civil twilight threshold
-        # This is the classical threshold used in traditional astrology
-        return -8.0  # Standard civil twilight altitude
-        
+        sun_distance = sun_data[2]
+
+        # Convert ecliptic coordinates to altitude/azimuth
+        geopos = (longitude, latitude, 0)  # Observer position (east positive)
+        _, altitude, _ = swe.azalt(
+            jd_ut,
+            swe.ECL2HOR,
+            geopos,
+            0,  # Atmospheric pressure (ignored)
+            0,  # Atmospheric temperature (ignored)
+            (sun_longitude, sun_latitude, sun_distance),
+        )
+
+        return float(altitude)
+
     except Exception:
-        return -8.0  # Default to civil twilight
+        # Fallback to classical civil twilight threshold
+        return -8.0
 
 
 def calculate_moon_variable_speed(jd_ut: float) -> float:

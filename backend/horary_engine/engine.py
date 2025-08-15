@@ -358,13 +358,14 @@ class EnhancedTraditionalAstrologicalCalculator:
         
         # Classical visibility conditions
         if planet == Planet.MERCURY:
-            # Mercury rejoices near Sun but needs visibility
-            if elongation >= 10.0 and planet_pos.sign in [Sign.GEMINI, Sign.VIRGO]:
-                return True
-            # Or if greater elongation (18° for Mercury)
-            if elongation >= 18.0:
-                return True
-                
+            # Mercury rejoices near Sun but still requires the Sun to be below the horizon
+            if sun_altitude <= -8.0:
+                if elongation >= 10.0 and planet_pos.sign in [Sign.GEMINI, Sign.VIRGO]:
+                    return True
+                # Or if greater elongation (18° for Mercury)
+                if elongation >= 18.0:
+                    return True
+
         elif planet == Planet.VENUS:
             # Venus as morning/evening star exception
             if elongation >= 10.0:  # Minimum visibility
