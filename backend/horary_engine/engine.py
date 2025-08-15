@@ -3149,7 +3149,12 @@ class EnhancedTraditionalHoraryJudgmentEngine:
         direct_aspect = self._find_applying_aspect(chart, querent, quesited)
         if not direct_aspect:
             return {"found": False}  # No pending perfection = no prohibition possible
-        
+
+        # Calculate timing for the main perfection
+        querent_pos = chart.planets[querent]
+        quesited_pos = chart.planets[quesited]
+        main_perfection_days = self._days_to_aspect_perfection(querent_pos, quesited_pos, direct_aspect)
+
         # TRADITIONAL REQUIREMENT 2: Check if any third planet completes aspect first
         for aspect in chart.aspects:
             if not aspect.applying:
@@ -3169,7 +3174,15 @@ class EnhancedTraditionalHoraryJudgmentEngine:
                 continue  # Not a prohibition scenario
             
             # TRADITIONAL REQUIREMENT 3: Prohibiting aspect must complete before significator perfection
-            if aspect.degrees_to_exact < direct_aspect["degrees_to_exact"]:
+            prohibiting_pos = chart.planets[prohibiting_planet]
+            target_pos = chart.planets[target_significator]
+            prohibiting_days = self._days_to_aspect_perfection(
+                target_pos,
+                prohibiting_pos,
+                {"degrees_to_exact": aspect.degrees_to_exact},
+            )
+
+            if prohibiting_days < main_perfection_days:
                 
                 # Assess severity based on prohibiting planet
                 base_confidence = config.confidence.denial.prohibition
