@@ -1081,13 +1081,17 @@ class EnhancedTraditionalHoraryJudgmentEngine:
         reasoning = []
         config = cfg()
         confidence = config.confidence.base_confidence
+        preconditions = {"R1": False, "R3": False, "R4": False, "R21": False, "R26": False, "R6": False}
         
         # 1. Enhanced radicality with configuration
         if not ignore_radicality:
             radicality = check_enhanced_radicality(chart, ignore_saturn_7th)
             if not radicality["valid"]:
+                preconditions["R1"] = True
                 reasoning.append(f"⚠️ Radicality: {radicality['reason']}")
                 reason = radicality["reason"]
+                if "Saturn" in reason:
+                    preconditions["R21"] = True
                 # Early or late Ascendant only gives a modest penalty
                 if "Ascendant too early" in reason or "Ascendant too late" in reason:
                     penalty = getattr(config.radicality, "asc_warning_penalty", 15)
@@ -1103,6 +1107,7 @@ class EnhancedTraditionalHoraryJudgmentEngine:
         if not ignore_void_moon:
             void_check = self._is_moon_void_of_course_enhanced(chart)
             if void_check["void"]:
+                preconditions["R3"] = True
                 if void_check.get("exception"):
                     reasoning.append(f"⚠️  Void Moon noted but excepted: {void_check['reason']}")
                 else:
@@ -1120,7 +1125,8 @@ class EnhancedTraditionalHoraryJudgmentEngine:
                 "result": "CANNOT JUDGE",
                 "confidence": 0,
                 "reasoning": reasoning + [significators["reason"]],
-                "timing": None
+                "timing": None,
+                "preconditions": preconditions
             }
         
         reasoning.append(f"⚪ Significators: {significators['description']}")
@@ -1154,7 +1160,9 @@ class EnhancedTraditionalHoraryJudgmentEngine:
         # Enhanced solar condition analysis
         solar_factors = self._analyze_enhanced_solar_factors(
             chart, querent_planet, quesited_planet, ignore_combustion)
-        
+        if solar_factors.get("combustion_count", 0) > 0 and not ignore_combustion:
+            preconditions["R4"] = True
+
         if solar_factors["significant"]:
             # Don't add generic solar conditions message - will be added below with context
             
@@ -1208,7 +1216,9 @@ class EnhancedTraditionalHoraryJudgmentEngine:
                             "traditional_factors": {
                                 "perfection_type": "impediment_denial",
                                 "impediment_type": "severe_combustion_and_debilitation"
-                            }
+                            },
+                            "solar_factors": solar_factors,
+                            "preconditions": preconditions
                         }
                     
                     confidence -= min(combustion_penalty, 50)  # Increased penalty cap
@@ -1255,7 +1265,8 @@ class EnhancedTraditionalHoraryJudgmentEngine:
                         "quesited_strength": chart.planets[quesited_planet].dignity_score,
                         f"{item_name}_strength": chart.planets[item_significator].dignity_score
                     },
-                    "solar_factors": solar_factors
+                    "solar_factors": solar_factors,
+                    "preconditions": preconditions
                 }
         
         # Standard perfection check for non-transaction questions
@@ -1270,7 +1281,7 @@ class EnhancedTraditionalHoraryJudgmentEngine:
             reasoning.append(f"3rd person analysis: Student ({primary_significator.value}) seeking Success ({secondary_significator.value})")
         
         perfection = self._check_enhanced_perfection(chart, primary_significator, secondary_significator,
-                                                   exaltation_confidence_boost)
+                                                   exaltation_confidence_boost) or {"perfects": False}
         # If a direct aspect exists, handle prohibition or immediate denial before considering Moon aspects
         if "aspect" in perfection:
             prohibition_result = self._check_traditional_prohibition(chart, primary_significator, secondary_significator)
@@ -1288,6 +1299,7 @@ class EnhancedTraditionalHoraryJudgmentEngine:
                         "quesited_strength": chart.planets[quesited_planet].dignity_score,
                     },
                     "solar_factors": solar_factors,
+                    "preconditions": preconditions,
                 }
 
             if not perfection["perfects"]:
@@ -1303,16 +1315,18 @@ class EnhancedTraditionalHoraryJudgmentEngine:
                         "quesited_strength": chart.planets[quesited_planet].dignity_score,
                     },
                     "solar_factors": solar_factors,
+                    "preconditions": preconditions,
                 }
 
         # GENERAL ENHANCEMENT: Check Moon-Sun aspects in education questions (traditional co-significator analysis)
-        if not perfection["perfects"] and question_analysis.get("question_type") == "education":
+        if not perfection.get("perfects") and question_analysis.get("question_type") == "education":
             moon_sun_perfection = self._check_moon_sun_education_perfection(chart, question_analysis)
             if moon_sun_perfection["perfects"]:
+                preconditions["R26"] = True
                 perfection = moon_sun_perfection
                 reasoning.append(f"Moon-Sun education perfection: {moon_sun_perfection['reason']}")
         
-        if perfection["perfects"]:
+        if perfection.get("perfects"):
             result = "YES" if perfection["favorable"] else "NO"
             confidence = min(confidence, perfection["confidence"])
             
@@ -1350,7 +1364,8 @@ class EnhancedTraditionalHoraryJudgmentEngine:
                     "querent_strength": chart.planets[querent_planet].dignity_score,
                     "quesited_strength": chart.planets[quesited_planet].dignity_score
                 },
-                "solar_factors": solar_factors
+                "solar_factors": solar_factors,
+                "preconditions": preconditions
             }
         
         # 3.5. Traditional Same-Ruler Logic (FIXED: Unity defaults to YES unless explicit prohibition)
@@ -1494,7 +1509,8 @@ class EnhancedTraditionalHoraryJudgmentEngine:
                     "quesited_strength": shared_position.dignity_score,  # Same ruler = same strength
                     "moon_void": moon_testimony.get("void_of_course", False)
                 },
-                "solar_factors": solar_factors
+                "solar_factors": solar_factors,
+                "preconditions": preconditions
             }
         
         # 3.6. PRIORITY: Check Moon's next applying aspect to significators (traditional key indicator)
@@ -1513,7 +1529,8 @@ class EnhancedTraditionalHoraryJudgmentEngine:
                         "quesited_strength": chart.planets[quesited_planet].dignity_score,
                         "moon_void": moon_next_aspect_result.get("void_moon", False)
                     },
-                    "solar_factors": solar_factors
+                    "solar_factors": solar_factors,
+                    "preconditions": preconditions
                 }
             else:
                 reasoning.append(
@@ -1531,7 +1548,8 @@ class EnhancedTraditionalHoraryJudgmentEngine:
                 "confidence": min(confidence, denial["confidence"]),
                 "reasoning": reasoning + [f"🔴 Denial: {denial['reason']}"],
                 "timing": None,
-                "solar_factors": solar_factors
+                "solar_factors": solar_factors,
+                "preconditions": preconditions
             }
         
         # 4.5. ENHANCED: Check theft/loss-specific denial factors
@@ -1539,11 +1557,12 @@ class EnhancedTraditionalHoraryJudgmentEngine:
         if theft_denials:
             combined_theft_denial = "; ".join(theft_denials)
             return {
-                "result": "NO", 
+                "result": "NO",
                 "confidence": 80,  # High confidence for traditional theft denial factors
                 "reasoning": reasoning + [f"🔴 Theft/Loss Denial: {combined_theft_denial}"],
                 "timing": None,
-                "solar_factors": solar_factors
+                "solar_factors": solar_factors,
+                "preconditions": preconditions
             }
         
         # 5. ENHANCED: Check benefic aspects to significators - BUT ONLY as secondary testimony
@@ -1577,7 +1596,8 @@ class EnhancedTraditionalHoraryJudgmentEngine:
                         "reception": self._detect_reception_between_planets(chart, querent_planet, quesited_planet),
                         "benefic_noted": True
                     },
-                    "solar_factors": solar_factors
+                    "solar_factors": solar_factors,
+                    "preconditions": preconditions
                 }
             else:
                 # REMOVED: "benefic_only" path - Traditional horary requires significator perfection
@@ -1597,7 +1617,8 @@ class EnhancedTraditionalHoraryJudgmentEngine:
                         "quesited_strength": quesited_pos.dignity_score,
                         "reception": self._detect_reception_between_planets(chart, querent_planet, quesited_planet)
                     },
-                    "solar_factors": solar_factors
+                    "solar_factors": solar_factors,
+                    "preconditions": preconditions
                 }
         
         # 6. PREGNANCY-SPECIFIC: Check for Moon→benefic OR L1↔L5 reception (FIXED: don't auto-deny)
@@ -1642,7 +1663,8 @@ class EnhancedTraditionalHoraryJudgmentEngine:
                         "quesited_strength": chart.planets[quesited_planet].dignity_score,
                         "moon_benefic": has_moon_benefic
                     },
-                    "solar_factors": solar_factors
+                    "solar_factors": solar_factors,
+                    "preconditions": preconditions
                 }
         
         # 7. FALLBACK: Build specific denial reasoning based on actual chart analysis
@@ -1678,7 +1700,8 @@ class EnhancedTraditionalHoraryJudgmentEngine:
         
         combined_denial = "; ".join(denial_reasons)
         reasoning.append(f"Denial: {combined_denial}")
-        
+        preconditions["R6"] = True
+
         return {
             "result": "NO",
             "confidence": 75,
@@ -1691,7 +1714,8 @@ class EnhancedTraditionalHoraryJudgmentEngine:
                 "reception": self._detect_reception_between_planets(chart, querent_planet, quesited_planet),
                 "benefic_noted": benefic_support.get("total_score", 0) > 0
             },
-            "solar_factors": solar_factors
+            "solar_factors": solar_factors,
+            "preconditions": preconditions
         }
     
     
@@ -2994,10 +3018,7 @@ class EnhancedTraditionalHoraryJudgmentEngine:
                 "reception": reception
             }
         
-        return {
-            "perfects": False,
-            "reason": "No perfection found between significators"
-        }
+        return None
     
     def _check_moon_sun_education_perfection(self, chart: HoraryChart, question_analysis: Dict) -> Dict[str, Any]:
         """Check Moon-Sun aspects in education questions (traditional co-significator analysis)"""

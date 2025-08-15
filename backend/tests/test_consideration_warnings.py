@@ -79,6 +79,7 @@ def test_non_radical_chart_still_returns(monkeypatch):
         cfg().confidence.perfection.direct_basic,
     )
     assert result["confidence"] == expected_confidence
+    assert result["preconditions"]["R6"] is False
 
 
 def test_void_moon_chart_still_returns(monkeypatch):
@@ -95,4 +96,5 @@ def test_void_moon_chart_still_returns(monkeypatch):
     assert result["result"] == "YES"
     assert any("Void Moon" in r for r in result["reasoning"])
     assert result["confidence"] == cfg().confidence.lunar_confidence_caps.neutral
+    assert result["preconditions"]["R6"] is False
 
