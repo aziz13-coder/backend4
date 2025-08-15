@@ -94,6 +94,10 @@ def test_under_beams_penalty_applied(monkeypatch):
     assert result["result"] == "YES"
     assert any("under beams" in r.lower() for r in result["reasoning"])
     expected_confidence = cfg().confidence.base_confidence - cfg().confidence.solar.under_beams_penalty
+    modifiers = engine._evaluate_significator_angularity(chart, Planet.MERCURY, Planet.JUPITER)
+    expected_confidence = max(0, min(expected_confidence + modifiers["delta"], 100))
+    end_support = engine._evaluate_end_of_matter_support(chart, Planet.MERCURY)
+    expected_confidence = max(0, min(expected_confidence + end_support["bonus"], 100))
     assert result["confidence"] == expected_confidence
 
 

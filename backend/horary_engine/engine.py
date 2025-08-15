@@ -1315,7 +1315,18 @@ class EnhancedTraditionalHoraryJudgmentEngine:
 
             # CRITICAL FIX 3: Apply dignity-based confidence adjustment (can mitigate retrograde)
             confidence = self._apply_dignity_confidence_adjustment(confidence, chart, querent_planet, quesited_planet, reasoning)
-            
+
+            # Non-gating modifiers
+            angularity_info = self._evaluate_significator_angularity(chart, querent_planet, quesited_planet)
+            if angularity_info["reasoning"]:
+                reasoning.extend(angularity_info["reasoning"])
+            confidence = max(0, min(confidence + angularity_info["delta"], 100))
+
+            end_support = self._evaluate_end_of_matter_support(chart, querent_planet)
+            if end_support["reason"]:
+                reasoning.append(end_support["reason"])
+            confidence = max(0, min(confidence + end_support["bonus"], 100))
+
             # Clear step-by-step traditional reasoning
             if perfection["type"] == "direct_denied":
                 reasoning.append(f"❌ Direct aspect denied: {perfection['reason']}")
@@ -1495,16 +1506,19 @@ class EnhancedTraditionalHoraryJudgmentEngine:
             moon_next_aspect_result["decisive"] = False
 
         # Append Moon's testimony and adjust confidence instead of returning early
-        if moon_next_aspect_result["result"] == "NO":
+        result_key = moon_next_aspect_result.get("result")
+        reason_text = moon_next_aspect_result.get("reason", "")
+        confidence_cap = moon_next_aspect_result.get("confidence")
+        if result_key == "NO":
             reasoning.append(
-                f"Moon's next aspect denies perfection: {moon_next_aspect_result['reason']}"
+                f"Moon's next aspect denies perfection: {reason_text}"
             )
-            confidence = min(confidence, moon_next_aspect_result["confidence"])
         else:
             reasoning.append(
-                f"Moon's next aspect supports but cannot perfect: {moon_next_aspect_result['reason']}"
+                f"Moon's next aspect supports but cannot perfect: {reason_text}"
             )
-            confidence = min(confidence, moon_next_aspect_result["confidence"])
+        if confidence_cap is not None:
+            confidence = min(confidence, confidence_cap)
         
         # 3.7. Enhanced Moon testimony analysis when no decisive Moon aspect
         moon_testimony = self._check_enhanced_moon_testimony(chart, querent_planet, quesited_planet, ignore_void_moon)
@@ -2433,8 +2447,52 @@ class EnhancedTraditionalHoraryJudgmentEngine:
         # Dignity bonus
         if benefic_pos.dignity_score > 0:
             base_strength += min(3, benefic_pos.dignity_score)
-            
+
         return max(0, base_strength)
+
+    def _evaluate_end_of_matter_support(self, chart: HoraryChart, querent: Planet) -> Dict[str, Any]:
+        """Check if the 4th house ruler supports the outcome."""
+        l4 = chart.house_rulers.get(4)
+        if not l4:
+            return {"bonus": 0, "reason": ""}
+
+        targets = [querent, Planet.MOON]
+        favorable_aspects = [Aspect.CONJUNCTION, Aspect.SEXTILE, Aspect.TRINE]
+
+        for target in targets:
+            if l4 == target:
+                continue
+
+            for aspect in chart.aspects:
+                if ((aspect.planet1 == l4 and aspect.planet2 == target) or
+                    (aspect.planet2 == l4 and aspect.planet1 == target)):
+                    if aspect.aspect in favorable_aspects and aspect.applying:
+                        desc = self._format_aspect_for_display(l4.value, aspect.aspect.value, target.value, aspect.applying)
+                        return {"bonus": 3, "reason": f"End of matter support: {desc}"}
+
+            reception = self._detect_reception_between_planets(chart, l4, target)
+            if reception != "none":
+                reception_text = self._format_reception_for_display(reception, l4, target, chart)
+                return {"bonus": 3, "reason": f"End of matter support via reception: {reception_text}"}
+
+        return {"bonus": 0, "reason": ""}
+
+    def _evaluate_significator_angularity(self, chart: HoraryChart, querent: Planet, quesited: Planet) -> Dict[str, Any]:
+        """Adjust confidence based on angularity of significators."""
+        adjustment = 0
+        details: List[str] = []
+        for planet in [querent, quesited]:
+            pos = chart.planets[planet]
+            angularity = self.calculator._get_traditional_angularity(pos.longitude, chart.houses, pos.house)
+            if angularity == "angular":
+                adjustment += 3
+                details.append(f"{planet.value} angular (House {pos.house}) strengthens testimony")
+            elif angularity == "cadent":
+                adjustment -= 3
+                details.append(f"{planet.value} cadent (House {pos.house}) weakens testimony")
+            else:
+                details.append(f"{planet.value} succedent (House {pos.house}) offers neutral support")
+        return {"delta": adjustment, "reasoning": details}
     
     def _is_moon_void_of_course_enhanced(self, chart: HoraryChart) -> Dict[str, Any]:
         """Enhanced void of course check with configurable methods"""

@@ -78,6 +78,10 @@ def test_non_radical_chart_still_returns(monkeypatch):
         cfg().confidence.base_confidence - cfg().radicality.asc_warning_penalty,
         cfg().confidence.perfection.direct_basic,
     )
+    modifiers = engine._evaluate_significator_angularity(chart, Planet.MERCURY, Planet.JUPITER)
+    expected_confidence = max(0, min(expected_confidence + modifiers["delta"], 100))
+    end_support = engine._evaluate_end_of_matter_support(chart, Planet.MERCURY)
+    expected_confidence = max(0, min(expected_confidence + end_support["bonus"], 100))
     assert result["confidence"] == expected_confidence
 
 
@@ -94,5 +98,10 @@ def test_void_moon_chart_still_returns(monkeypatch):
 
     assert result["result"] == "YES"
     assert any("Void Moon" in r for r in result["reasoning"])
-    assert result["confidence"] == cfg().confidence.lunar_confidence_caps.neutral
+    expected_confidence = cfg().confidence.lunar_confidence_caps.neutral
+    modifiers = engine._evaluate_significator_angularity(chart, Planet.MERCURY, Planet.JUPITER)
+    expected_confidence = max(0, min(expected_confidence + modifiers["delta"], 100))
+    end_support = engine._evaluate_end_of_matter_support(chart, Planet.MERCURY)
+    expected_confidence = max(0, min(expected_confidence + end_support["bonus"], 100))
+    assert result["confidence"] == expected_confidence
 
