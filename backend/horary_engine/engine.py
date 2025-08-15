@@ -3262,20 +3262,21 @@ class EnhancedTraditionalHoraryJudgmentEngine:
     
     
     def _apply_confidence_threshold(self, result: str, confidence: int, reasoning: List[str]) -> tuple:
-        """Apply confidence threshold - <50% should default to NO or INCONCLUSIVE (FIXED)"""
-        
-        # If confidence is very low (<50%), default to NO unless there's explicit perfection
-        if confidence < 50:
-            if result == "YES":
-                # Low confidence YES should become INCONCLUSIVE or NO
-                if confidence < 30:
-                    reasoning.append(f"Very low confidence ({confidence}%) - matter denied")
-                    return "NO", max(confidence, 20)  # Minimum 20% for any judgment
-                else:
-                    reasoning.append(f"Low confidence ({confidence}%) - matter uncertain")
-                    return "INCONCLUSIVE", confidence
-            # NO results can stay NO even with low confidence
-        
+        """Apply confidence threshold - low confidence YES should not auto-deny"""
+
+        # When confidence is below 50%, treat YES results cautiously
+        if confidence < 50 and result == "YES":
+            if confidence < 30:
+                reasoning.append(
+                    f"Very low confidence ({confidence}%) - result inconclusive despite perfection"
+                )
+                return "INCONCLUSIVE", max(confidence, 20)
+            else:
+                reasoning.append(
+                    f"Low confidence ({confidence}%) - positive indication with caution"
+                )
+                return "YES", confidence
+
         return result, confidence
     
     def _check_moon_next_aspect_to_significators(self, chart: HoraryChart, querent: Planet, quesited: Planet, ignore_void_moon: bool = False) -> Dict[str, Any]:
