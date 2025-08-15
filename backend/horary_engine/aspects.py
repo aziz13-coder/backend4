@@ -100,10 +100,10 @@ def calculate_moon_next_aspect(
                     moon_pos, planet_pos, aspect_type, moon_speed
                 ):
                     degrees_to_exact = orb_diff
-                    relative_speed = abs(moon_speed - abs(planet_pos.speed))
+                    relative_speed = moon_speed - planet_pos.speed
                     time_to_exact = (
-                        degrees_to_exact / relative_speed
-                        if relative_speed > 0
+                        degrees_to_exact / abs(relative_speed)
+                        if relative_speed != 0
                         else float("inf")
                     )
 
@@ -142,9 +142,12 @@ def is_moon_separating_from_aspect(
     if current_separation > 180:
         current_separation = 360 - current_separation
 
-    # Future Moon position
+    # Future positions considering both bodies' motion
     future_moon_lon = (moon_pos.longitude + moon_speed * time_increment) % 360
-    future_separation = abs(future_moon_lon - planet_pos.longitude)
+    future_planet_lon = (
+        planet_pos.longitude + planet_pos.speed * time_increment
+    ) % 360
+    future_separation = abs(future_moon_lon - future_planet_lon)
     if future_separation > 180:
         future_separation = 360 - future_separation
 
@@ -169,9 +172,12 @@ def is_moon_applying_to_aspect(
     if current_separation > 180:
         current_separation = 360 - current_separation
 
-    # Future Moon position
+    # Future positions considering both bodies' motion
     future_moon_lon = (moon_pos.longitude + moon_speed * time_increment) % 360
-    future_separation = abs(future_moon_lon - planet_pos.longitude)
+    future_planet_lon = (
+        planet_pos.longitude + planet_pos.speed * time_increment
+    ) % 360
+    future_separation = abs(future_moon_lon - future_planet_lon)
     if future_separation > 180:
         future_separation = 360 - future_separation
 
