@@ -3341,7 +3341,13 @@ class EnhancedTraditionalHoraryJudgmentEngine:
         
         # Calculate base confidence
         base_confidence = 75 if favorable else 65  # Moon aspects are influential
-        
+
+        # When the Moon is applying to a significator, it's a strong positive
+        # testimony. Boost confidence substantially but keep it purely
+        # additive so it cannot flip a YES into a NO on its own.
+        if next_aspect.applying and favorable:
+            base_confidence += 20
+
         # Void of course reduces confidence but doesn't eliminate decisiveness
         if void_of_course:
             base_confidence -= 15
