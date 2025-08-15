@@ -1988,16 +1988,17 @@ class EnhancedTraditionalHoraryJudgmentEngine:
             
             # Reception helps but is not absolutely required for translation
             reception_bonus = 0
-            reception_note = ""
             reception_display = ""
-            
+            reception_note = ""
+
             if reception_with_querent or reception_with_quesited:
                 reception_bonus = 10
-                reception_note = " with reception"
                 if reception_with_querent:
                     reception_display = reception_querent_data["display_text"]
                 elif reception_with_quesited:
                     reception_display = reception_quesited_data["display_text"]
+                if reception_display:
+                    reception_note = " with reception"
                 
             # Base confidence from traditional sources
             confidence = 65 + reception_bonus

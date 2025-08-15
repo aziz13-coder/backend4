@@ -77,7 +77,7 @@ moon:
   
   # Translation and collection requirements
   translation:
-    require_speed_advantage: false  # Remove speed prerequisite
+    require_speed_advantage: true  # Translator must be faster than significators
     require_proper_sequence: true   # Must separate then apply
     require_reception: false        # Reception not mandatory
   
