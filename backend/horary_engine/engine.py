@@ -1157,62 +1157,68 @@ class EnhancedTraditionalHoraryJudgmentEngine:
         
         if solar_factors["significant"]:
             # Don't add generic solar conditions message - will be added below with context
-            
+            solar_config = getattr(config, "solar", None)
+            r17b_enabled = getattr(solar_config, "severe_impediment_denial_enabled", False) if solar_config else False
+
             # ENHANCED: Adjust confidence based on solar conditions affecting SIGNIFICATORS
             if solar_factors["cazimi_count"] > 0:
                 confidence += config.confidence.solar.cazimi_bonus
                 reasoning.append("Cazimi planets significantly strengthen the judgment")
-            elif solar_factors["combustion_count"] > 0 and not ignore_combustion:
-                # ENHANCED: Only penalize combustion if it affects the actual significators
-                querent_combusted = querent_planet.value in [p["planet"] for p in solar_factors.get("detailed_analyses", {}).values() if p.get("condition") == "Combustion"]
-                quesited_combusted = quesited_planet.value in [p["planet"] for p in solar_factors.get("detailed_analyses", {}).values() if p.get("condition") == "Combustion"] 
-                
-                if querent_combusted or quesited_combusted:
-                    # STRENGTHENED: Severe impediments can cause denial, not just difficulty
-                    combusted_sigs = []
-                    combustion_penalty = 0
-                    severe_impediments = 0
-                    
-                    for planet in [querent_planet, quesited_planet]:
-                        if planet.value in [p["planet"] for p in solar_factors.get("detailed_analyses", {}).values() if p.get("condition") == "Combustion"]:
-                            planet_analysis = solar_factors["detailed_analyses"].get(planet.value, {})
-                            distance = planet_analysis.get("distance_from_sun", 0)
-                            planet_dignity = chart.planets[planet].dignity_score
-                            
-                            if distance < 1.0:  # Extremely close combustion
-                                severe_impediments += 1
-                                combustion_penalty += 40  
-                                combusted_sigs.append(f"{planet.value} (extreme combustion at {distance:.1f}°)")
-                            elif distance < 2.0:  # Very close combustion
-                                combustion_penalty += 25  
-                                combusted_sigs.append(f"{planet.value} (severe combustion at {distance:.1f}°)")
-                            elif distance < 5.0:  # Moderate combustion  
-                                combustion_penalty += 15  
-                                combusted_sigs.append(f"{planet.value} (combustion at {distance:.1f}°)")
-                            else:  # Light combustion
-                                combustion_penalty += 10  
-                                combusted_sigs.append(f"{planet.value} (light combustion at {distance:.1f}°)")
-                            
-                            # Additional penalty for severely debilitated + combusted significator
-                            if planet_dignity <= -4 and distance < 3.0:
-                                severe_impediments += 1
-                                combusted_sigs.append(f"(also severely debilitated: {planet_dignity:+d})")
-                    
-                    # HARD DENIAL: Multiple severe impediments on significators
-                    if severe_impediments >= 2:
-                        return {
-                            "result": "NO",
-                            "confidence": 90,
-                            "reasoning": reasoning + [f"🔴 Multiple severe impediments deny perfection: {', '.join(combusted_sigs)}"],
-                            "timing": None,
-                            "traditional_factors": {
-                                "perfection_type": "impediment_denial",
-                                "impediment_type": "severe_combustion_and_debilitation"
-                            }
-                        }
-                    
-                    confidence -= min(combustion_penalty, 50)  # Increased penalty cap
-                    reasoning.append(f"🔴 Combustion impediment: {', '.join(combusted_sigs)}")
+            elif (solar_factors["combustion_count"] > 0 or solar_factors["under_beams_count"] > 0) and not ignore_combustion:
+                penalty_reasons = []
+                solar_penalty = 0
+                severe_impediments = 0
+
+                for planet in [querent_planet, quesited_planet]:
+                    planet_analysis = solar_factors["detailed_analyses"].get(planet.value, {})
+                    condition = planet_analysis.get("condition")
+                    if condition not in ["Combustion", "Under the Beams"]:
+                        continue
+
+                    distance = planet_analysis.get("distance_from_sun", 0)
+                    planet_dignity = chart.planets[planet].dignity_score
+
+                    if condition == "Combustion":
+                        if distance < 1.0:
+                            severe_impediments += 1
+                            solar_penalty += 40
+                            reason = f"{planet.value} (extreme combustion at {distance:.1f}°)"
+                        elif distance < 2.0:
+                            solar_penalty += 25
+                            reason = f"{planet.value} (severe combustion at {distance:.1f}°)"
+                        elif distance < 5.0:
+                            solar_penalty += 15
+                            reason = f"{planet.value} (combustion at {distance:.1f}°)"
+                        else:
+                            solar_penalty += 10
+                            reason = f"{planet.value} (light combustion at {distance:.1f}°)"
+
+                        if planet_dignity <= -4 and distance < 3.0:
+                            severe_impediments += 1
+                            reason += f" (also severely debilitated: {planet_dignity:+d})"
+
+                        penalty_reasons.append(reason)
+
+                    elif condition == "Under the Beams":
+                        solar_penalty += config.confidence.solar.under_beams_penalty
+                        penalty_reasons.append(f"{planet.value} under beams")
+
+                if r17b_enabled and severe_impediments >= 2:
+                    return {
+                        "result": "NO",
+                        "confidence": 90,
+                        "reasoning": reasoning + [f"🔴 Multiple severe solar impediments deny perfection: {', '.join(penalty_reasons)}"],
+                        "timing": None,
+                        "traditional_factors": {
+                            "perfection_type": "impediment_denial",
+                            "impediment_type": "severe_combustion_and_debilitation"
+                        },
+                        "solar_factors": solar_factors,
+                    }
+
+                if penalty_reasons:
+                    confidence -= min(solar_penalty, 50)
+                    reasoning.append(f"🔴 Solar impediment: {', '.join(penalty_reasons)}")
                 else:
                     reasoning.append(f"🟡 Solar conditions: {solar_factors['summary']} (significators unaffected)")
         
