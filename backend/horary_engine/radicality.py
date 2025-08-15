@@ -1,6 +1,9 @@
 """Radicality checks for horary charts."""
 
+import datetime
 from typing import Any, Dict
+
+import swisseph as swe
 
 from horary_config import cfg
 from models import HoraryChart, Planet, Sign
@@ -39,12 +42,74 @@ def _sign_triplicity(sign: Sign) -> str:
 
 
 def check_planetary_hour_agreement(chart: HoraryChart, config) -> Dict[str, Any]:
-    """Check if planetary hour ruler agrees with Ascendant ruler."""
+    """Check if planetary hour ruler agrees with Ascendant ruler.
 
-    dt = chart.date_time
-    weekday = dt.weekday()
+    Computes local sunrise and sunset using Swiss Ephemeris and divides the
+    day/night into twelve unequal planetary hours. The active planetary hour at
+    the query time determines the hour ruler.
+    """
+
+    # Ensure timezone-aware datetimes
+    dt_local = chart.date_time
+    if dt_local.tzinfo is None:
+        dt_local = dt_local.replace(tzinfo=datetime.timezone.utc)
+    dt_utc = chart.date_time_utc
+    if dt_utc.tzinfo is None:
+        dt_utc = dt_utc.replace(tzinfo=datetime.timezone.utc)
+
+    lat, lon = chart.location
+
+    # Julian day numbers for computations
+    jd = swe.julday(
+        dt_utc.year,
+        dt_utc.month,
+        dt_utc.day,
+        dt_utc.hour + dt_utc.minute / 60 + dt_utc.second / 3600,
+        swe.GREG_CAL,
+    )
+    jd0 = swe.julday(dt_utc.year, dt_utc.month, dt_utc.day, 0.0, swe.GREG_CAL)
+
+    # Sunrise and sunset for today
+    _, rise_today = swe.rise_trans(jd0, swe.SUN, swe.CALC_RISE, (lon, lat, 0))
+    sunrise_today = rise_today[0]
+    _, set_today = swe.rise_trans(jd0, swe.SUN, swe.CALC_SET, (lon, lat, 0))
+    sunset_today = set_today[0]
+
+    if jd >= sunrise_today:
+        # After today's sunrise
+        sunrise_prev = sunrise_today
+        sunset_prev = sunset_today
+        _, rise_next = swe.rise_trans(jd0 + 1, swe.SUN, swe.CALC_RISE, (lon, lat, 0))
+        sunrise_next = rise_next[0]
+    else:
+        # Before today's sunrise -> use previous day's data
+        _, rise_prev = swe.rise_trans(jd0 - 1, swe.SUN, swe.CALC_RISE, (lon, lat, 0))
+        sunrise_prev = rise_prev[0]
+        _, set_prev = swe.rise_trans(jd0 - 1, swe.SUN, swe.CALC_SET, (lon, lat, 0))
+        sunset_prev = set_prev[0]
+        sunrise_next = sunrise_today
+
+    # Determine the planetary day ruler (day starts at local sunrise)
+    y, m, d, h = swe.revjul(sunrise_today, swe.GREG_CAL)
+    sunrise_today_dt = (
+        datetime.datetime(y, m, d, tzinfo=datetime.timezone.utc)
+        + datetime.timedelta(hours=h)
+    ).astimezone(dt_local.tzinfo)
+    weekday = dt_local.weekday()
+    if dt_local < sunrise_today_dt:
+        weekday = (weekday - 1) % 7
     day_ruler = PLANETARY_DAY_RULERS.get(weekday, Planet.SUN)
-    hour_index = dt.hour
+
+    # Determine planetary hour index
+    if sunrise_prev <= jd < sunset_prev:
+        day_length = sunset_prev - sunrise_prev
+        hour_len = day_length / 12.0
+        hour_index = int((jd - sunrise_prev) / hour_len)
+    else:
+        night_length = sunrise_next - sunset_prev
+        hour_len = night_length / 12.0
+        hour_index = 12 + int((jd - sunset_prev) / hour_len)
+
     start_idx = PLANET_SEQUENCE.index(day_ruler)
     hour_ruler = PLANET_SEQUENCE[(start_idx + hour_index) % 7]
 
