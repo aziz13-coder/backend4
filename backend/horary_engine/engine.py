@@ -1086,7 +1086,13 @@ class EnhancedTraditionalHoraryJudgmentEngine:
             radicality = check_enhanced_radicality(chart, ignore_saturn_7th)
             if not radicality["valid"]:
                 reasoning.append(f"⚠️ Radicality: {radicality['reason']}")
-                confidence = min(confidence, config.confidence.lunar_confidence_caps.neutral)
+                reason = radicality["reason"]
+                # Early or late Ascendant only gives a modest penalty
+                if "Ascendant too early" in reason or "Ascendant too late" in reason:
+                    penalty = getattr(config.radicality, "asc_warning_penalty", 15)
+                    confidence = max(confidence - penalty, 0)
+                else:
+                    confidence = min(confidence, config.confidence.lunar_confidence_caps.neutral)
             else:
                 reasoning.append(f"Radicality: {radicality['reason']}")
         else:
