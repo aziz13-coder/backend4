@@ -3225,20 +3225,35 @@ class EnhancedTraditionalHoraryJudgmentEngine:
         # Use enhanced sign exit calculations
         days_to_exit_1 = days_to_sign_exit(pos1.longitude, pos1.speed)
         days_to_exit_2 = days_to_sign_exit(pos2.longitude, pos2.speed)
-        
+
         # Estimate days until aspect perfects
         relative_speed = abs(pos1.speed - pos2.speed)
         if relative_speed == 0:
             return False
-        
+
         days_to_perfect = aspect_info["degrees_to_exact"] / relative_speed
-        
+
+        # NEW: Check for future stations before perfection
+        jd_start = chart.julian_day
+        planet_id_1 = self.calculator.planets_swe.get(pos1.planet)
+        planet_id_2 = self.calculator.planets_swe.get(pos2.planet)
+
+        if planet_id_1 is not None:
+            station_jd_1 = calculate_next_station_time(planet_id_1, jd_start)
+            if station_jd_1 and (station_jd_1 - jd_start) < days_to_perfect:
+                return False
+
+        if planet_id_2 is not None:
+            station_jd_2 = calculate_next_station_time(planet_id_2, jd_start)
+            if station_jd_2 and (station_jd_2 - jd_start) < days_to_perfect:
+                return False
+
         # Check if either planet exits sign before perfection
         if days_to_exit_1 and days_to_perfect > days_to_exit_1:
             return False
         if days_to_exit_2 and days_to_perfect > days_to_exit_2:
             return False
-        
+
         return True
     
     def _check_enhanced_mutual_reception(self, chart: HoraryChart, planet1: Planet, planet2: Planet) -> str:
