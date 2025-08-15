@@ -131,6 +131,7 @@ radicality:
   via_combusta_enabled: true # check Moon in Via Combusta
   hour_agreement_enabled: false # check planetary hour agreement
   hour_agreement_mode: "ruler"  # options: ruler, sign, triplicity
+  asc_warning_penalty: 15  # Confidence penalty for early or late Ascendant warnings
 
   via_combusta:
     libra_start: 15.0    # degrees into Libra

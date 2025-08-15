@@ -42,7 +42,17 @@ def patch_engine_for_tests(engine, monkeypatch):
         return {"valid": True, "querent": Planet.MERCURY, "quesited": Planet.JUPITER, "description": "Mercury-Jupiter"}
     monkeypatch.setattr(engine, "_identify_significators", fake_identify_significators)
     monkeypatch.setattr(engine, "_analyze_enhanced_solar_factors", lambda *a, **k: {"significant": False})
-    monkeypatch.setattr(engine, "_check_enhanced_perfection", lambda *a, **k: {"perfects": True, "favorable": True, "confidence": 80, "type": "direct", "reason": "test"})
+    monkeypatch.setattr(
+        engine,
+        "_check_enhanced_perfection",
+        lambda *a, **k: {
+            "perfects": True,
+            "favorable": True,
+            "confidence": cfg().confidence.perfection.direct_basic,
+            "type": "direct",
+            "reason": "test",
+        },
+    )
     monkeypatch.setattr(engine, "_apply_aspect_direction_adjustment", lambda c, p, r: c)
     monkeypatch.setattr(engine, "_apply_dignity_confidence_adjustment", lambda c, ch, q, qs, r: c)
     monkeypatch.setattr(engine, "_apply_retrograde_quesited_penalty", lambda c, ch, q, r: c)
@@ -64,7 +74,11 @@ def test_non_radical_chart_still_returns(monkeypatch):
 
     assert result["result"] == "YES"
     assert any("Ascendant" in r for r in result["reasoning"])
-    assert result["confidence"] == cfg().confidence.lunar_confidence_caps.neutral
+    expected_confidence = min(
+        cfg().confidence.base_confidence - cfg().radicality.asc_warning_penalty,
+        cfg().confidence.perfection.direct_basic,
+    )
+    assert result["confidence"] == expected_confidence
 
 
 def test_void_moon_chart_still_returns(monkeypatch):
