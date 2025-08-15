@@ -160,6 +160,7 @@ retrograde:
   automatic_denial: false  # Don't automatically deny for retrograde
   dignity_penalty: -2     # Penalty for retrograde significator
   frustration_penalty: -5 # Additional penalty for retrograde frustration
+  quesited_penalty: 12    # Confidence penalty for retrograde quesited (mitigable)
 
 reception:
   terms:

@@ -1318,11 +1318,11 @@ class EnhancedTraditionalHoraryJudgmentEngine:
             # CRITICAL FIX 1: Apply separating aspect penalty
             confidence = self._apply_aspect_direction_adjustment(confidence, perfection, reasoning)
             
-            # CRITICAL FIX 2: Apply dignity-based confidence adjustment
-            confidence = self._apply_dignity_confidence_adjustment(confidence, chart, querent_planet, quesited_planet, reasoning)
-            
-            # CRITICAL FIX 3: Apply retrograde quesited penalty
+            # CRITICAL FIX 2: Apply retrograde quesited penalty early so bonuses can offset it
             confidence = self._apply_retrograde_quesited_penalty(confidence, chart, quesited_planet, reasoning)
+
+            # CRITICAL FIX 3: Apply dignity-based confidence adjustment (can mitigate retrograde)
+            confidence = self._apply_dignity_confidence_adjustment(confidence, chart, querent_planet, quesited_planet, reasoning)
             
             # Clear step-by-step traditional reasoning
             if perfection["type"] == "direct_denied":
@@ -1885,17 +1885,18 @@ class EnhancedTraditionalHoraryJudgmentEngine:
             
         return confidence
     
-    def _apply_retrograde_quesited_penalty(self, confidence: float, chart: HoraryChart, 
+    def _apply_retrograde_quesited_penalty(self, confidence: float, chart: HoraryChart,
                                          quesited: Planet, reasoning: List[str]) -> float:
-        """CRITICAL FIX 3: Apply penalty for retrograde quesited"""
-        
+        """CRITICAL FIX 2: Apply penalty for retrograde quesited"""
+
+        config = cfg()
         quesited_pos = chart.planets[quesited]
         if quesited_pos.retrograde:
             # Retrograde quesited = turning away, obstacles, delays
-            penalty = 25
+            penalty = getattr(config.retrograde, "quesited_penalty", 12)
             confidence = max(confidence - penalty, 10)
             reasoning.append(f"🔴 Retrograde quesited: -{penalty}% (turning away from success)")
-            
+
         return confidence
     
     def _check_enhanced_translation_of_light(self, chart: HoraryChart, querent: Planet, quesited: Planet) -> Dict[str, Any]:
